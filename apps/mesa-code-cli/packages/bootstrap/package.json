@@ -1,0 +1,45 @@
+{
+  "name": "@mesa-code/bootstrap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./v4-replay": {
+      "types": "./dist/mesa-code-protocol-v4/replay.d.ts",
+      "import": "./dist/mesa-code-protocol-v4/replay.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "node ../../scripts/clean-dist.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "lint:fix": "oxlint --write src"
+  },
+  "dependencies": {
+    "@mesa-code/adapters": "workspace:*",
+    "@mesa-code/contracts": "workspace:*",
+    "@mesa-code/core": "workspace:*",
+    "@mesa-code/dynamic-workflow": "workspace:*",
+    "@mesa-code/dynamic-workflow-runtime": "workspace:*",
+    "@mesa-code/i18n": "workspace:*",
+    "@mesa-code/provider": "workspace:*",
+    "@mesa-code/provider-node": "workspace:*",
+    "@mesa-code/shared": "workspace:*",
+    "@mesa-code/telemetry": "workspace:*",
+    "diff": "^9.0.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/yazl": "^3.3.1",
+    "@mesa-code/formal-proof": "workspace:*",
+    "yazl": "^3.3.1"
+  }
+}

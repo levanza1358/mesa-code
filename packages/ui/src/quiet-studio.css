@@ -1,0 +1,209 @@
+.quiet-studio-nav-selected {
+  background-color: var(--color-accent);
+  box-shadow: inset 2px 0 0 var(--color-brand);
+}
+
+/* Surfaces stay independent of the root's existing accent overrides. */
+:root.theme-zai-light {
+  --color-background: #faf9f6;
+  --color-background-alt: #f2f1ed;
+  --color-background-win-alt: #f2f1ed;
+  --color-sidebar: #f0efea;
+  --color-header: #f0efea;
+  --color-panel: #f4f3ef;
+  --color-surface: #efeee8;
+  --color-surface-hover: #e7e7df;
+  --color-card: #fffefa;
+  --color-card-selected: #e7ebe5;
+  --color-input: #fffefa;
+  --color-input-focused: #fffefa;
+  --color-border: #d8dbd3;
+  --color-card-border: #d8dbd3;
+  --color-input-border: #c6cec3;
+  --color-foreground: #26332b;
+  --color-foreground-subtle: #59665d;
+  --color-foreground-subtlest: #68756c;
+}
+
+:root.theme-zai-dark {
+  --color-background: #141916;
+  --color-background-alt: #1b211d;
+  --color-background-win-alt: #1b211d;
+  --color-sidebar: #1b211d;
+  --color-header: #1b211d;
+  --color-panel: #1b211d;
+  --color-surface: #252d28;
+  --color-surface-hover: #303a33;
+  --color-card: #202823;
+  --color-card-selected: #303a33;
+  --color-input: #141916;
+  --color-input-focused: #141916;
+  --color-border: #3c4940;
+  --color-card-border: #3c4940;
+  --color-input-border: #46554a;
+  --color-foreground: #edf2ee;
+  --color-foreground-subtle: #aab8ae;
+  --color-foreground-subtlest: #94a399;
+}
+
+:root.theme-black {
+  --color-background: #000;
+  --color-sidebar: #080b09;
+  --color-panel: #080b09;
+  --color-surface: #171c19;
+  --color-surface-hover: #252d28;
+  --color-border: #354139;
+}
+
+:root,
+[data-code-palette] {
+  --mesa-code-syntax-foreground: var(--color-foreground);
+  --mesa-code-syntax-background: var(--color-card);
+  --mesa-code-syntax-token-comment: var(--color-foreground-subtle);
+  --mesa-code-syntax-token-keyword: var(--color-brand);
+  --mesa-code-syntax-token-string: #246447;
+  --mesa-code-syntax-token-string-expression: #246447;
+  --mesa-code-syntax-token-constant: #825416;
+  --mesa-code-syntax-token-function: #315e98;
+  --mesa-code-syntax-token-parameter: #7a438b;
+  --mesa-code-syntax-token-punctuation: var(--color-foreground-subtle);
+  --mesa-code-syntax-token-link: var(--color-brand);
+  --mesa-code-syntax-token-inserted: #246447;
+  --mesa-code-syntax-token-deleted: #a13d4c;
+  --mesa-code-syntax-token-changed: var(--color-brand);
+  /* Diff renderers read ansi slots as the added/removed/modified accents. */
+  --mesa-code-syntax-ansi-black: var(--color-foreground-subtlest);
+  --mesa-code-syntax-ansi-red: #a13d4c;
+  --mesa-code-syntax-ansi-green: #246447;
+  --mesa-code-syntax-ansi-yellow: #825416;
+  --mesa-code-syntax-ansi-blue: #315e98;
+  --mesa-code-syntax-ansi-magenta: #7a438b;
+  --mesa-code-syntax-ansi-cyan: var(--color-brand);
+  --mesa-code-syntax-ansi-white: var(--color-foreground);
+}
+
+:root.dark,
+[data-code-palette="dark"] {
+  --mesa-code-syntax-token-string: #a5dfb9;
+  --mesa-code-syntax-token-string-expression: #a5dfb9;
+  --mesa-code-syntax-token-constant: #f1d39c;
+  --mesa-code-syntax-token-function: #a9d8ff;
+  --mesa-code-syntax-token-parameter: #ddbeef;
+  --mesa-code-syntax-token-inserted: #a5dfb9;
+  --mesa-code-syntax-token-deleted: #ffb4bd;
+  --mesa-code-syntax-ansi-red: #ffb4bd;
+  --mesa-code-syntax-ansi-green: #a5dfb9;
+  --mesa-code-syntax-ansi-yellow: #f1d39c;
+  --mesa-code-syntax-ansi-blue: #a9d8ff;
+  --mesa-code-syntax-ansi-magenta: #ddbeef;
+  --mesa-code-syntax-ansi-white: var(--color-foreground);
+}
+
+[data-code-palette="light"] {
+  --mesa-code-syntax-foreground: #26332b;
+  --mesa-code-syntax-background: #fffefa;
+  --mesa-code-syntax-token-comment: #59665d;
+  --mesa-code-syntax-token-punctuation: #59665d;
+  --mesa-code-syntax-token-inserted: #246447;
+  --mesa-code-syntax-token-deleted: #a13d4c;
+  --mesa-code-syntax-ansi-red: #a13d4c;
+  --mesa-code-syntax-ansi-green: #246447;
+  --mesa-code-syntax-ansi-yellow: #825416;
+  --mesa-code-syntax-ansi-blue: #315e98;
+  --mesa-code-syntax-ansi-magenta: #7a438b;
+}
+
+[data-workspace-shell] {
+  background: var(--color-background);
+}
+
+.quiet-studio-sidebar {
+  border-right: 1px solid var(--color-border);
+}
+
+.quiet-studio-sidebar [data-slot="button"][aria-selected="true"],
+.quiet-studio-sidebar [data-slot="button"][aria-current="page"] {
+  background: var(--color-accent);
+  box-shadow: inset 2px 0 var(--color-brand);
+}
+
+.quiet-studio-conversation {
+  background: var(--color-background);
+}
+
+.quiet-studio-conversation .chat-composer-input-surface {
+  border: 1px solid var(--color-input-border);
+  border-radius: 14px;
+  background: var(--color-panel);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--color-foreground) 4%, transparent);
+}
+
+.quiet-studio-conversation .chat-composer-input-surface:focus-within {
+  border-color: var(--color-input-border-focused);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 16%, transparent);
+}
+
+/* The queued sheet renders above the composer and tucks under it (-mb-7/pb-7), so the two must
+   read as one surface. It mirrors the composer's border token and fill and drops its bottom
+   border, where the composer's top edge continues the outline. Never draw a second full frame
+   here: the composer paints later on top, which would expose a doubled outline with mismatched
+   radii at the seam. */
+.quiet-studio-conversation .quiet-studio-queue-sheet {
+  border: 1px solid var(--color-input-border);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: var(--color-panel);
+}
+
+/* Both wrappers drew a frame; the outer surface owns the border and focus ring. */
+.quiet-studio-conversation .quiet-studio-composer-editor {
+  border: 0 !important;
+  border-radius: inherit;
+  background: transparent;
+}
+
+.quiet-studio-conversation .quiet-studio-composer-editor > [class~="group/toolbar"] {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.quiet-studio-conversation .quiet-studio-composer-editor [data-composer-leading-actions] {
+  flex: 1 1 20rem;
+}
+
+.quiet-studio-conversation .quiet-studio-composer-editor [data-composer-leading-content] {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  flex-shrink: 1;
+}
+
+.quiet-studio-appearance [data-slot="select-trigger"] {
+  width: 100%;
+  max-width: 100%;
+}
+
+.quiet-studio-appearance [data-slot="card"] {
+  overflow: hidden;
+}
+
+@container appearance (max-width: 480px) {
+  .quiet-studio-appearance [data-settings-row] > .grid {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
+  }
+}
+
+@media (max-width: 767px) {
+  .quiet-studio-appearance [data-slot="select-trigger"] {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiet-studio-sidebar-frame *,
+  .quiet-studio-appearance * {
+    transition-duration: 0s !important;
+  }
+}

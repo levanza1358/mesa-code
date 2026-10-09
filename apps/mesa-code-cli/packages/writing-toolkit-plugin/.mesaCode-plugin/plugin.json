@@ -1,0 +1,8 @@
+{
+  "name": "writing-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based technical documentation, document drafting, presentation outlines, and source-verified research briefs using available tools; no bundled runtime or MCP services.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["es2025", "dom", "dom.iterable"]
+  },
+  "include": ["src"],
+  // client depends on rpc directly. Without an explicit project reference, typecheck follows the
+  // workspace package entry and recompiles rpc sources. With the reference, client reads rpc's
+  // generated declaration files first.
+  "references": [{ "path": "../services" }, { "path": "../rpc" }]
+}

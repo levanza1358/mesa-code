@@ -1,0 +1,219 @@
+/*
+ * Startup splash backdrop.
+ *
+ * Opaque themed surface that covers the transparent Electron window while the
+ * startup gate resolves. Uses compositor-friendly properties only (opacity and
+ * transform) so it never triggers layout work during startup, and it is
+ * removed from the DOM as soon as the gate clears.
+ */
+
+.root-startup-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.root-startup-splash::before {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--color-brand) 12%, transparent), transparent 32%),
+    linear-gradient(135deg, var(--color-background-alt), var(--color-background));
+  content: "";
+}
+
+.root-startup-splash__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  animation: root-startup-splash-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.root-startup-splash__brand-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.root-startup-splash__brand-mark > div {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-brand) 24%, transparent),
+    0 18px 50px color-mix(in oklab, var(--color-brand) 18%, transparent);
+}
+
+.root-startup-splash__brand-line {
+  width: 34px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  box-shadow: 0 0 18px color-mix(in oklab, var(--color-brand) 65%, transparent);
+}
+
+.root-startup-splash__copy {
+  display: flex;
+  min-width: 220px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.root-startup-splash__eyebrow,
+.root-startup-splash__title,
+.root-startup-splash__label,
+.root-startup-splash__footer {
+  margin: 0;
+}
+
+.root-startup-splash__eyebrow {
+  color: var(--color-foreground-subtle);
+  font-size: var(--text-ui-xs);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.root-startup-splash__title {
+  color: var(--color-foreground);
+  font-size: clamp(26px, 4vw, 34px);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.root-startup-splash__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--color-foreground-subtle);
+  font-size: var(--text-ui-sm);
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  animation: root-startup-splash-pulse 1.6s ease-in-out infinite;
+}
+
+.root-startup-splash__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-brand) 14%, transparent);
+}
+
+.root-startup-splash__footer {
+  position: absolute;
+  bottom: 28px;
+  z-index: 1;
+  color: var(--color-foreground-subtlest);
+  font-size: var(--text-ui-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.root-startup-splash__ambient,
+.root-startup-splash__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.root-startup-splash__ambient {
+  z-index: -1;
+}
+
+.root-startup-splash__grid {
+  opacity: 0.28;
+  background-image: linear-gradient(
+      color-mix(in oklab, var(--color-border) 32%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, color-mix(in oklab, var(--color-border) 32%, transparent) 1px, transparent 1px);
+  background-position: center;
+  background-size: 52px 52px;
+  mask-image: radial-gradient(ellipse at center, black 0%, transparent 68%);
+}
+
+.root-startup-splash__orb {
+  position: absolute;
+  display: block;
+  width: min(42vw, 520px);
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in oklab, var(--color-brand) 14%, transparent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.root-startup-splash__orb::after {
+  position: absolute;
+  inset: 14%;
+  border: inherit;
+  border-radius: inherit;
+  content: "";
+}
+
+.root-startup-splash__orb--primary {
+  top: 42%;
+  left: 50%;
+}
+
+.root-startup-splash__orb--secondary {
+  top: 42%;
+  left: 50%;
+  width: min(62vw, 760px);
+  opacity: 0.5;
+  transform: translate(-50%, -50%) rotate(22deg) scaleY(0.42);
+}
+
+@keyframes root-startup-splash-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes root-startup-splash-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root-startup-splash__content,
+  .root-startup-splash__label {
+    animation: none;
+  }
+  .root-startup-splash__label {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .root-startup-splash__content {
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .root-startup-splash__footer {
+    bottom: 20px;
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "cloud-ops-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based deployment planning, container image review, observability setup, and cost review guidance using existing tools and declared cloud dependencies; no bundled runtime or MCP services.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

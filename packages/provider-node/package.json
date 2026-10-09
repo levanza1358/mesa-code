@@ -1,0 +1,23 @@
+{
+  "name": "@mesa-code/provider-node",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "@mesa-code/provider": "workspace:*",
+    "@mesa-code/shared": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@mesa-code/model-option-map": "workspace:*",
+    "typescript": "^6.0.2"
+  }
+}

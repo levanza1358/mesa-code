@@ -1,0 +1,40 @@
+{
+  "name": "@mesa-code/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Main CLI application for mesa-code",
+  "bin": {
+    "mesa-code": "./dist/mesa-code.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/mesa-code.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:desktop-agent": "node scripts/build.mjs --desktop-agent",
+    "build:sea": "pnpm --dir ../../../.. exec turbo --skip-infer --cwd apps/mesa-code-cli run build --filter=!@mesa-code/cli --force && pnpm build && node scripts/build-sea.mjs --all",
+    "sea": "node scripts/build-sea.mjs",
+    "upload:sea": "node scripts/upload-sea-smb.mjs",
+    "clean": "node ../../scripts/clean-dist.mjs",
+    "dev": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "lint:fix": "oxlint --write src"
+  },
+  "dependencies": {
+    "@mesa-code/adapters": "workspace:*",
+    "@mesa-code/bootstrap": "workspace:*",
+    "@mesa-code/contracts": "workspace:*",
+    "@mesa-code/core": "workspace:*",
+    "@mesa-code/dynamic-workflow-runtime": "workspace:*",
+    "@mesa-code/i18n": "workspace:*",
+    "@mesa-code/provider-node": "workspace:*",
+    "@mesa-code/shared": "workspace:*",
+    "@mesa-code/shared-types": "workspace:*",
+    "@mesa-code/tui": "workspace:*",
+    "dotenv": "^17.4.2",
+    "playwright-core": "1.59.1"
+  }
+}

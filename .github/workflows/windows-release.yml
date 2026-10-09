@@ -1,0 +1,84 @@
+name: Windows release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  MESA_CODE_SKIP_REMOTE_ASSETS: '1'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: pnpm bundle:desktop -- --os win --arch x64
+
+      - name: Validate release artifacts
+        id: artifact
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem 'packages/desktop/dist/MesaCode-*-win-x64.exe' -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one Windows x64 installer, found $($installers.Count)."
+          }
+
+          $installer = $installers[0]
+          $version = [regex]::Match($installer.Name, '^MesaCode-(?<version>.+)-win-x64\.exe$').Groups['version'].Value
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "Could not read the installer version from $($installer.Name)."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "installer=$($installer.Name)" >> $env:GITHUB_OUTPUT
+
+      - name: Create immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "v${{ steps.artifact.outputs.version }}-$('${{ github.sha }}'.Substring(0, 8))"
+          $existing = gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $tag already exists; refusing to overwrite it."
+          }
+
+          $assets = @("packages/desktop/dist/${{ steps.artifact.outputs.installer }}")
+          $blockmap = Get-ChildItem "packages/desktop/dist/MesaCode-${{ steps.artifact.outputs.version }}-win-x64.exe.blockmap" -File -ErrorAction SilentlyContinue
+          if ($null -ne $blockmap) { $assets += $blockmap.FullName }
+          $latest = Get-Item 'packages/desktop/dist/latest.yml' -ErrorAction SilentlyContinue
+          if ($null -ne $latest) { $assets += $latest.FullName }
+
+          gh release create $tag @assets --title "Mesa Code ${{ steps.artifact.outputs.version }}" --generate-notes --target '${{ github.sha }}'

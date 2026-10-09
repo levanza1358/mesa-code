@@ -1,0 +1,8 @@
+{
+  "name": "testing-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based test planning, end-to-end scenarios, flaky-test triage, and test data fixtures using existing project harnesses; includes no bundled runtime, MCP service, or dependency.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "mobile-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based mobile layout, native permission, offline sync, and mobile release readiness guidance using existing tools and native platform tooling; no bundled runtime or MCP services.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

@@ -1,0 +1,2569 @@
+@import "tailwindcss" source(".");
+@import "tw-animate-css";
+@import "tailwind-scrollbar-hide/v4";
+@import "shadcn/tailwind.css";
+@import "@xterm/xterm/css/xterm.css";
+@import "katex/dist/katex.min.css";
+@import "./quiet-studio.css";
+@source "../../../node_modules/streamdown/dist/*.js"; /* Explicitly scan streamdown runtime class names */
+
+@plugin "@tailwindcss/typography";
+
+/*  KaTeX emits both a MathML assistive layer and an HTML visual layer; without the katex CSS both
+ * layers are shown, so inline and block formulas look like they "render twice, once as formula and once as plain text". */
+
+/*  On Linux desktop the window title bar is drawn by the renderer, so some overlays must avoid the title bar hit area on that platform only. */
+@custom-variant platform-linux-desktop (&:where(.platform-linux-desktop, .platform-linux-desktop *));
+@custom-variant platform-linux-window-maximized (&:where(.platform-linux-desktop.window-maximized, .platform-linux-desktop.window-maximized *));
+
+/*  macOS desktop uses a hidden native title bar, so top-right floating actions must avoid its native hit area. */
+@custom-variant platform-mac-desktop (&:where(.platform-mac-desktop, .platform-mac-desktop *));
+
+/*  On Windows desktop the native titleBarOverlay occupies the top-right corner, so deep overlays such as the image lightbox
+ * use a separate platform variant with the real Window Controls Overlay safe area; plain Web does not inherit this rule. */
+@custom-variant platform-windows-desktop (&:where(.platform-windows-desktop, .platform-windows-desktop *));
+
+/*
+ * Current UI uses the shadcn radix-mira component source directly, and these components rely heavily on
+ * semantic variants such as data-active / data-horizontal / data-vertical.
+ * Upstream does not hand-write data-[state=active] per component; it maps Radix data-state and data-orientation
+ * uniformly through @custom-variant in shadcn/tailwind.css.
+ * This repo previously imported only tailwindcss, so local compilation matched only the bare data-active attribute,
+ * which left components such as Tabs, Separator, ScrollArea, and ButtonGroup with "class names present but effects missing".
+ * Here we add shadcn/tailwind.css and tw-animate-css the way the official registry does,
+ * restoring upstream-identical compilation semantics and animation utilities for this batch of components in one go.
+ */
+
+/*
+ * styles.css is pulled in indirectly by web/desktop from the @mesa-code/ui package. In this workspace setup Tailwind v4
+ * cannot reliably add the UI package's TSX components to the scan with source(".") alone, so utilities used by
+ * newer components such as Select (bg-popover, shadow-md, overflow-x-hidden) are simply absent, leaving the page with
+ * only a subset of "accidentally matched" generic classes. This explicit @source entry makes Tailwind always scan the UI package source,
+ */
+@source "./**/*.{ts,tsx}";
+/* Build-time guarantee for commonly used cloud template styles; not a runtime class allowlist. */
+@source inline("text-center text-ui-base/relaxed text-foreground-subtle font-semibold font-normal text-foreground whitespace-nowrap underline decoration-foreground-subtle decoration-dashed underline-offset-4");
+
+/* Frosted glass effect: html/body need a transparent background so Electron vibrancy shows through */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: transparent !important;
+}
+
+:root {
+  --ui-font-size: 14px;
+    /* Shared desktop navigation width. WorkspaceShellLayout overrides this
+      value while the resizable Home sidebar is mounted. */
+    --workspace-sidebar-width: 264px;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Chinese template descriptions break per character, which splits phrases such as "briefing" and pushes punctuation to the next line.
+ * Enable phrase-level line breaking where Chromium supports it; keep normal breaking elsewhere to avoid keep-all overflow on narrow screens. */
+.text-wrap-phrase {
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: strict;
+  text-wrap: pretty;
+}
+
+@supports (word-break: auto-phrase) {
+  .text-wrap-phrase {
+    word-break: auto-phrase;
+  }
+}
+
+.side-pane-open-tab-shell {
+  container: side-pane-open-tab / inline-size;
+}
+
+@container side-pane-open-tab (min-width: 480px) {
+  .side-pane-open-tab-content {
+    max-width: 34rem;
+  }
+
+  .side-pane-open-tab-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+
+  .side-pane-open-tab-button {
+    flex-direction: column;
+    gap: 0.375rem;
+    height: 5.5rem;
+    justify-content: center;
+  }
+
+  .side-pane-open-tab-button-label {
+    flex: 0 1 auto;
+    text-align: center;
+  }
+}
+
+#root {
+  /*  After a Windows desktop window is resized, if the root node only grows with content, Chromium occasionally leaves the new area to the host layer.
+   * Here the React mount point is pinned to the full dynamic viewport so desktop/Web/mobile all fill the visible area from the root node. */
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/*
+ *  Some browsers / Electron runtimes add a system-level focus highlight border on focus-visible,
+ * showing a yellow outline unrelated to the product theme, which looks like "randomly appearing accessibility styling".
+ * Here we clear both outline and the focus ring box-shadow globally, avoiding mixing system highlight with component-local rings.
+ */
+*:focus,
+*:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+@media (forced-colors: active) {
+  *:focus,
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* === Theme variables === */
+
+@theme {
+  /* Windows Consolas has no CJK glyphs, so the default Tailwind stack falls back to a serif face for Chinese.
+   * Keep each platform's Latin monospace font and explicitly prepend each platform's CJK sans-serif font before the generic monospace. */
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", monospace;
+  --text-ui-xl: calc(var(--ui-font-size) + 4px);
+  --text-ui-lg: calc(var(--ui-font-size) + 2px);
+  --text-ui-base: var(--ui-font-size);
+  --text-ui-caption: calc(var(--ui-font-size) - 1px);
+  --text-ui-sm: calc(var(--ui-font-size) - 2px);
+  --text-ui-xs: calc(var(--ui-font-size) - 4px);
+  /* Exception scale: workflow diagram axis surfaces only (tick labels, lane codes, unit suffixes); never for content text.
+   * See DESIGN.md "UI font tokens". */
+  --text-ui-2xs: calc(var(--ui-font-size) - 5px);
+  /* Uppercase monospace micro labels (CAUSALITY GRAPH / TIMEBASE / KEY) need wider tracking at 9-10px. */
+  --tracking-wf-label: 0.09em;
+  /* iOS Safari zooms focused inputs smaller than 16px; the lower bound on that platform must not follow the UI font size down. */
+  --text-mobile-input-safe: 16px;
+  --animated-gradient-text-strong: rgba(10, 10, 10, 1);
+  --animated-gradient-text-soft: rgba(10, 10, 10, 0.22);
+  --color-background: var(--color-neutral-50);
+  --color-background-alt: color-mix(in oklab, var(--color-neutral-100) 60%, transparent);
+  --color-background-win-alt: var(--color-neutral-200);
+  /* Mesa Code accent identity: teal/emerald, deliberately not the upstream sky/blue. */
+  --color-brand: var(--color-teal-600);
+  --color-ring: var(--color-brand);
+  --color-icon-blue: var(--color-terminal-bright-blue);
+  --color-trajectory-user: #2563eb;
+  --color-trajectory-assistant: #0f766e;
+  --color-trajectory-reasoning: #7c3aed;
+  --color-trajectory-tool-call: #d97706;
+  --color-trajectory-tool-result: #0284c7;
+  /* Workflow causality diagram instrument rendering:
+   * rule is weaker than --color-border — ticks and idle tracks repeat about 40 times per diagram, so 10% would accumulate into a grey haze. */
+  --color-workflow-rule: color-mix(in oklab, var(--color-neutral-950) 5.5%, transparent);
+  --color-workflow-trace: color-mix(in oklab, var(--color-neutral-950) 30%, transparent);
+  --color-workflow-trace-strong: color-mix(in oklab, var(--color-neutral-950) 55%, transparent);
+  --color-accent: var(--color-teal-50);
+  --color-find-highlight: #fde68a;
+  --color-find-highlight-active: #facc15;
+  --color-border: color-mix(in oklab, var(--color-neutral-950) 10%, transparent);
+  --color-border-hover: color-mix(in oklab, var(--color-neutral-950) 20%, transparent);
+  --color-hover: var(--color-neutral-200);
+  --color-selected: color-mix(in oklab, var(--color-neutral-950) 10%, transparent);
+  --color-header: var(--color-neutral-100);
+  --color-panel: var(--color-neutral-100);
+  --color-sidebar: var(--color-neutral-100);
+  --color-surface: color-mix(in oklab, var(--color-neutral-950) 3%, transparent);
+  --color-surface-hover: color-mix(in oklab, var(--color-neutral-950) 5%, transparent);
+  --color-markdown-inline-code: var(--color-tag);
+  --color-card: var(--color-white);
+  --color-card-selected: var(--color-neutral-200);
+  --color-card-border: var(--color-border);
+  --color-popover: var(--color-white);
+  /* Fix: overlay components already use text-popover-foreground, but a missing variable made dark-theme log overlays inherit black text. */
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: var(--color-neutral-100);
+  --color-popover-border: var(--color-border);
+  --color-input: var(--color-white);
+  --color-input-focused: var(--color-neutral-50);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-brand);
+  --color-terminal-bg: var(--color-neutral-50);
+  --color-terminal-fg: var(--color-neutral-950);
+  --color-terminal-cursor: var(--color-neutral-950);
+  --color-terminal-cursor-accent: var(--color-neutral-50);
+  --color-terminal-selection: color-mix(in oklab, var(--color-teal-600) 32%, transparent);
+  --color-terminal-selection-inactive: color-mix(
+    in oklab,
+    var(--color-teal-600) 22%,
+    transparent
+  );
+  --color-terminal-black: var(--color-neutral-700);
+  --color-terminal-red: var(--color-red-500);
+  --color-terminal-green: var(--color-green-500);
+  --color-terminal-yellow: var(--color-yellow-500);
+  --color-terminal-blue: var(--color-sky-500);
+  --color-terminal-magenta: var(--color-fuchsia-500);
+  --color-terminal-cyan: var(--color-cyan-500);
+  --color-terminal-white: var(--color-neutral-500);
+  --color-terminal-bright-black: var(--color-neutral-500);
+  --color-terminal-bright-red: var(--color-red-500);
+  --color-terminal-bright-green: var(--color-green-500);
+  --color-terminal-bright-yellow: var(--color-yellow-500);
+  --color-terminal-bright-blue: var(--color-sky-500);
+  --color-terminal-bright-magenta: var(--color-fuchsia-500);
+  --color-terminal-bright-cyan: var(--color-cyan-500);
+  --color-terminal-bright-white: var(--color-neutral-950);
+  /* The app usage chart uses its own palette to avoid stacking high-saturation red/yellow/green from reusing terminal ANSI colors. */
+  --color-usage-chart-1: var(--color-sky-600);
+  --color-usage-chart-2: var(--color-teal-600);
+  --color-usage-chart-3: var(--color-violet-600);
+  --color-usage-chart-4: var(--color-rose-500);
+  --color-usage-chart-5: var(--color-indigo-500);
+  --color-usage-chart-6: var(--color-cyan-600);
+  /* Context breakdown uses a single blue ramp close to the reference UI to avoid a high-saturation rainbow in a small popover. */
+  --color-context-breakdown-1: var(--color-sky-600);
+  --color-context-breakdown-2: var(--color-sky-500);
+  --color-context-breakdown-3: var(--color-sky-400);
+  --color-context-breakdown-4: var(--color-sky-300);
+  --color-context-breakdown-5: var(--color-sky-200);
+  --color-context-breakdown-6: var(--color-sky-100);
+  --color-context-breakdown-7: color-mix(in oklab, var(--color-sky-100) 72%, var(--color-white));
+  /*  The heat map previously reused the brand color, but under the Zai theme brand is black/white and cannot keep the sky semantics. */
+  --color-usage-heatmap-0: color-mix(in oklab, var(--color-sky-500) 0%, var(--color-surface));
+  --color-usage-heatmap-1: color-mix(in oklab, var(--color-sky-500) 18%, var(--color-surface));
+  --color-usage-heatmap-2: color-mix(in oklab, var(--color-sky-500) 36%, var(--color-surface));
+  --color-usage-heatmap-3: color-mix(in oklab, var(--color-sky-600) 58%, var(--color-surface));
+  --color-usage-heatmap-4: color-mix(in oklab, var(--color-sky-700) 82%, var(--color-surface));
+  --color-tab: var(--color-neutral-100);
+  --color-tab-active: var(--color-white);
+  --color-tab-border: var(--color-border);
+  --color-menu: var(--color-white);
+  --color-menu-hover: var(--color-neutral-100);
+  --color-primary: var(--color-neutral-950);
+  --color-primary-foreground: var(--color-neutral-50);
+  --color-secondary: var(--color-neutral-300);
+  --color-interaction-ask-surface: var(--color-sky-50);
+  --color-interaction-ask-foreground: var(--color-sky-700);
+  --color-interaction-ask-fill: color-mix(in oklab, var(--color-green-500) 20%, transparent);
+  --color-interaction-confirmation-surface: var(--color-green-50);
+  --color-interaction-confirmation-foreground: var(--color-green-700);
+  --color-foreground: var(--color-neutral-700);
+  --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-700) 60%, transparent);
+  --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-700) 40%, transparent);
+  --color-foreground-inverse: var(--color-white);
+  --color-success: var(--color-green-600);
+  --color-success-foreground: var(--color-foreground-inverse);
+  --color-idle-task: var(--color-violet-600);
+  --color-idle-task-surface: var(--color-violet-50);
+  --color-destructive: var(--color-red-600);
+  --color-destructive-foreground: var(--color-foreground-inverse);
+  --color-warning: var(--color-yellow-600);
+  --color-feedback-privacy-hint: var(--color-yellow-600);
+  --color-warning-foreground: var(--color-foreground-inverse);
+  --color-diff-added: var(--color-green-600);
+  --color-diff-added-foreground: var(--color-foreground-inverse);
+  --color-diff-removed: var(--color-red-600);
+  --color-diff-removed-foreground: var(--color-foreground-inverse);
+  --color-git-none: var(--color-foreground);
+  --color-git-modified: var(--color-amber-600);
+  --color-git-added: var(--color-teal-600);
+  --color-git-deleted: var(--color-red-600);
+  --color-git-renamed: var(--color-sky-600);
+  --color-git-untracked: var(--color-teal-600);
+  --color-git-ignored: var(--color-foreground-subtlest);
+  --color-git-descendant: var(--color-amber-600);
+  --color-toast: var(--color-white);
+  --color-tooltip: var(--color-neutral-100);
+  --color-tooltip-foreground: var(--color-neutral-950);
+  --color-tooltip-tag: var(--color-neutral-200);
+  --color-tooltip-tag-foreground: color-mix(in oklab, var(--color-neutral-950) 60%, transparent);
+  --color-tag: var(--color-neutral-200);
+  --color-file-node: color-mix(in oklab, var(--color-sky-600) 14%, transparent);
+  --color-file-node-hover: color-mix(in oklab, var(--color-sky-600) 20%, transparent);
+  --color-file-node-foreground: var(--color-sky-600);
+  --color-skill-node: color-mix(in oklab, var(--color-violet-600) 14%, transparent);
+  --color-skill-node-hover: color-mix(in oklab, var(--color-violet-600) 20%, transparent);
+  --color-skill-node-foreground: var(--color-violet-600);
+  --color-command-node: color-mix(in oklab, var(--color-slate-500) 14%, transparent);
+  --color-command-node-hover: color-mix(in oklab, var(--color-slate-500) 20%, transparent);
+  --color-command-node-foreground: var(--color-slate-600);
+  --color-subagent-node: color-mix(in oklab, #6f7a2f 14%, transparent);
+  --color-subagent-node-hover: color-mix(in oklab, #6f7a2f 20%, transparent);
+  --color-subagent-node-foreground: #6f7a2f;
+  --color-session-node: color-mix(in oklab, var(--color-teal-600) 14%, transparent);
+  --color-session-node-hover: color-mix(in oklab, var(--color-teal-600) 20%, transparent);
+  --color-session-node-foreground: var(--color-teal-600);
+  --color-plugin-node: color-mix(in oklab, var(--color-amber-600) 14%, transparent);
+  --color-plugin-node-hover: color-mix(in oklab, var(--color-amber-600) 20%, transparent);
+  --color-plugin-node-foreground: var(--color-amber-600);
+  --color-plugin-paid-plan-badge: #ffe3c8;
+  --color-plugin-paid-plan-badge-foreground: #4b280f;
+}
+
+.dark {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.2);
+  --color-background: var(--color-neutral-900);
+  --color-background-alt: color-mix(in oklab, var(--color-neutral-800) 60%, transparent);
+  --color-background-win-alt: var(--color-neutral-800);
+  --color-brand: var(--color-teal-400);
+  --color-ring: var(--color-brand);
+  --color-trajectory-user: #60a5fa;
+  --color-trajectory-assistant: #2dd4bf;
+  --color-trajectory-reasoning: #a78bfa;
+  --color-trajectory-tool-call: #f59e0b;
+  --color-trajectory-tool-result: #38bdf8;
+  --color-workflow-rule: color-mix(in oklab, var(--color-white) 6.5%, transparent);
+  --color-workflow-trace: color-mix(in oklab, var(--color-white) 35%, transparent);
+  --color-workflow-trace-strong: color-mix(in oklab, var(--color-white) 60%, transparent);
+  --color-accent: color-mix(in oklab, var(--color-teal-950) 50%, transparent);
+  --color-find-highlight: #713f12;
+  --color-find-highlight-active: #a16207;
+  --color-border: color-mix(in oklab, var(--color-neutral-50) 10%, transparent);
+  --color-border-hover: color-mix(in oklab, var(--color-neutral-50) 30%, transparent);
+  --color-hover: var(--color-surface-hover);
+  --color-selected: color-mix(in oklab, var(--color-white) 10%, transparent);
+  --color-header: var(--color-neutral-900);
+  --color-panel: var(--color-neutral-900);
+  --color-sidebar: var(--color-neutral-950);
+  --color-surface: color-mix(in oklab, var(--color-white) 5%, transparent);
+  --color-surface-hover: color-mix(in oklab, var(--color-white) 10%, transparent);
+  --color-card: var(--color-neutral-800);
+  --color-card-selected: var(--color-neutral-700);
+  --color-card-border: var(--color-border);
+  --color-popover: var(--color-neutral-800);
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: var(--color-neutral-700);
+  --color-popover-border: var(--color-border);
+  --color-input: var(--color-neutral-800);
+  --color-input-focused: var(--color-neutral-950);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-brand);
+  --color-terminal-bg: var(--color-neutral-950);
+  --color-terminal-fg: var(--color-neutral-50);
+  --color-terminal-cursor: var(--color-neutral-50);
+  --color-terminal-cursor-accent: var(--color-neutral-950);
+  --color-terminal-selection: color-mix(in oklab, var(--color-teal-400) 26%, transparent);
+  --color-terminal-selection-inactive: color-mix(
+    in oklab,
+    var(--color-neutral-50) 16%,
+    transparent
+  );
+  --color-terminal-black: var(--color-neutral-800);
+  --color-terminal-red: var(--color-red-600);
+  --color-terminal-green: var(--color-green-600);
+  --color-terminal-yellow: var(--color-yellow-600);
+  --color-terminal-blue: var(--color-sky-600);
+  --color-terminal-magenta: var(--color-fuchsia-600);
+  --color-terminal-cyan: var(--color-cyan-600);
+  --color-terminal-white: var(--color-neutral-200);
+  --color-terminal-bright-black: var(--color-neutral-500);
+  --color-terminal-bright-red: var(--color-red-600);
+  --color-terminal-bright-green: var(--color-green-600);
+  --color-terminal-bright-yellow: var(--color-yellow-600);
+  --color-terminal-bright-blue: var(--color-sky-600);
+  --color-terminal-bright-magenta: var(--color-fuchsia-600);
+  --color-terminal-bright-cyan: var(--color-cyan-600);
+  --color-terminal-bright-white: var(--color-neutral-50);
+  --color-usage-chart-1: var(--color-sky-500);
+  --color-usage-chart-2: var(--color-teal-400);
+  --color-usage-chart-3: var(--color-violet-400);
+  --color-usage-chart-4: var(--color-rose-400);
+  --color-usage-chart-5: var(--color-indigo-400);
+  --color-usage-chart-6: var(--color-cyan-400);
+  --color-context-breakdown-1: var(--color-sky-400);
+  --color-context-breakdown-2: var(--color-sky-300);
+  --color-context-breakdown-3: var(--color-sky-200);
+  --color-context-breakdown-4: color-mix(in oklab, var(--color-sky-200) 84%, var(--color-white));
+  --color-context-breakdown-5: color-mix(in oklab, var(--color-sky-200) 72%, var(--color-white));
+  --color-context-breakdown-6: color-mix(in oklab, var(--color-sky-200) 60%, var(--color-white));
+  --color-context-breakdown-7: color-mix(in oklab, var(--color-sky-200) 48%, var(--color-white));
+  --color-usage-heatmap-0: color-mix(in oklab, var(--color-sky-400) 0%, var(--color-surface));
+  --color-usage-heatmap-1: color-mix(in oklab, var(--color-sky-400) 24%, var(--color-surface));
+  --color-usage-heatmap-2: color-mix(in oklab, var(--color-sky-400) 42%, var(--color-surface));
+  --color-usage-heatmap-3: color-mix(in oklab, var(--color-sky-400) 62%, var(--color-surface));
+  --color-usage-heatmap-4: color-mix(in oklab, var(--color-sky-300) 78%, var(--color-surface));
+  --color-tab: var(--color-neutral-800);
+  --color-tab-active: var(--color-neutral-950);
+  --color-tab-border: var(--color-border);
+  --color-menu: var(--color-neutral-950);
+  --color-menu-hover: var(--color-neutral-900);
+  --color-primary: var(--color-neutral-50);
+  --color-primary-foreground: var(--color-neutral-950);
+  --color-secondary: var(--color-neutral-700);
+  --color-interaction-ask-surface: color-mix(in oklab, var(--color-sky-950) 50%, transparent);
+  --color-interaction-ask-foreground: var(--color-sky-300);
+  --color-interaction-ask-fill: color-mix(in oklab, var(--color-green-400) 24%, transparent);
+  --color-interaction-confirmation-surface: color-mix(
+    in oklab,
+    var(--color-green-950) 45%,
+    transparent
+  );
+  --color-interaction-confirmation-foreground: var(--color-green-300);
+  --color-foreground: var(--color-neutral-200);
+  --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-200) 60%, transparent);
+  --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-200) 30%, transparent);
+  --color-foreground-inverse: var(--color-white);
+  --color-success: var(--color-green-500);
+  --color-success-foreground: var(--color-foreground-inverse);
+  --color-idle-task: var(--color-violet-400);
+  --color-idle-task-surface: color-mix(in oklab, var(--color-violet-950) 50%, transparent);
+  --color-destructive: var(--color-red-500);
+  --color-destructive-foreground: var(--color-foreground-inverse);
+  --color-warning: var(--color-yellow-500);
+  --color-feedback-privacy-hint: var(--color-yellow-300);
+  --color-warning-foreground: var(--color-foreground-inverse);
+  --color-diff-added: var(--color-green-500);
+  --color-diff-added-foreground: var(--color-foreground-inverse);
+  --color-diff-removed: var(--color-red-500);
+  --color-diff-removed-foreground: var(--color-foreground-inverse);
+  --color-git-none: var(--color-foreground);
+  --color-git-modified: var(--color-amber-400);
+  --color-git-added: var(--color-teal-400);
+  --color-git-deleted: var(--color-red-400);
+  --color-git-renamed: var(--color-sky-400);
+  --color-git-untracked: var(--color-teal-400);
+  --color-git-ignored: var(--color-foreground-subtlest);
+  --color-git-descendant: var(--color-amber-400);
+  --color-toast: var(--color-neutral-900);
+  --color-tooltip: var(--color-neutral-900);
+  --color-tooltip-foreground: var(--color-neutral-50);
+  --color-tooltip-tag: var(--color-neutral-800);
+  --color-tooltip-tag-foreground: color-mix(in oklab, var(--color-neutral-50) 60%, transparent);
+  --color-tag: var(--color-neutral-700);
+  --color-file-node: color-mix(in oklab, var(--color-sky-400) 18%, transparent);
+  --color-file-node-hover: color-mix(in oklab, var(--color-sky-400) 24%, transparent);
+  --color-file-node-foreground: var(--color-sky-300);
+  --color-skill-node: color-mix(in oklab, var(--color-violet-400) 18%, transparent);
+  --color-skill-node-hover: color-mix(in oklab, var(--color-violet-400) 24%, transparent);
+  --color-skill-node-foreground: var(--color-violet-300);
+  --color-command-node: color-mix(in oklab, var(--color-slate-300) 16%, transparent);
+  --color-command-node-hover: color-mix(in oklab, var(--color-slate-300) 22%, transparent);
+  --color-command-node-foreground: var(--color-slate-300);
+  --color-subagent-node: color-mix(in oklab, #b7bd75 18%, transparent);
+  --color-subagent-node-hover: color-mix(in oklab, #b7bd75 24%, transparent);
+  --color-subagent-node-foreground: #b7bd75;
+  --color-session-node: color-mix(in oklab, var(--color-teal-400) 18%, transparent);
+  --color-session-node-hover: color-mix(in oklab, var(--color-teal-400) 24%, transparent);
+  --color-session-node-foreground: var(--color-teal-300);
+  --color-plugin-node: color-mix(in oklab, var(--color-amber-400) 18%, transparent);
+  --color-plugin-node-hover: color-mix(in oklab, var(--color-amber-400) 24%, transparent);
+  --color-plugin-node-foreground: var(--color-amber-300);
+  --color-plugin-paid-plan-badge: #5a341b;
+  --color-plugin-paid-plan-badge-foreground: #ffd8b8;
+}
+
+.theme-zai-light {
+  --animated-gradient-text-strong: rgba(13, 13, 13, 1);
+  --animated-gradient-text-soft: rgba(13, 13, 13, 0.22);
+  --color-background: #f5f6f3;
+  --color-background-win-alt: #e6e9e3;
+  --color-background-alt: color-mix(in oklab, var(--color-background) 70%, transparent);
+  /* Mesa Code accent identity: jade/emerald replaces the inherited monochrome brand. */
+  --color-brand: #17683f;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-trajectory-user: #2563eb;
+  --color-trajectory-assistant: #0f766e;
+  --color-trajectory-reasoning: #7c3aed;
+  --color-trajectory-tool-call: #d97706;
+  --color-trajectory-tool-result: #0284c7;
+  --color-workflow-rule: rgba(32, 43, 35, 0.055);
+  --color-workflow-trace: rgba(32, 43, 35, 0.3);
+  --color-workflow-trace-strong: rgba(32, 43, 35, 0.55);
+  --color-find-highlight: #fff4eb;
+  --color-find-highlight-active: #ffb26b;
+  --color-border: #bec9bf;
+  --color-border-hover: #a8b5a9;
+  --color-hover: rgba(32, 43, 35, 0.05);
+  --color-selected: rgba(32, 43, 35, 0.06);
+  --color-header: #f5f6f3;
+  --color-panel: #edf0eb;
+  --color-sidebar: #edf0eb;
+  --color-surface: #e3e8e1;
+  --color-surface-hover: #dce2da;
+  --color-card: #ffffff;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #f5f6f3;
+  --color-popover-border: var(--color-border);
+  --color-input: #ffffff;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: var(--color-foreground);
+  --color-terminal-cursor: #0d0d0d;
+  --color-terminal-cursor-accent: var(--color-background);
+  --color-terminal-selection: rgba(11, 127, 255, 0.22);
+  --color-terminal-selection-inactive: rgba(13, 13, 13, 0.1);
+  --color-terminal-black: #5c5c5c;
+  --color-terminal-red: #e03131;
+  --color-terminal-green: #1e8a3e;
+  --color-terminal-yellow: #e07b00;
+  --color-terminal-blue: #0b7fff;
+  --color-terminal-magenta: #9e77ed;
+  --color-terminal-cyan: #0aa7a7;
+  --color-terminal-white: #adadad;
+  --color-terminal-bright-black: #888888;
+  --color-terminal-bright-red: #e03131;
+  --color-terminal-bright-green: #1e8a3e;
+  --color-terminal-bright-yellow: #e07b00;
+  --color-terminal-bright-blue: #0066dd;
+  --color-terminal-bright-magenta: #9e77ed;
+  --color-terminal-bright-cyan: #0aa7a7;
+  --color-terminal-bright-white: #0d0d0d;
+  --color-usage-chart-1: #0b7fff;
+  --color-usage-chart-2: #1e8a3e;
+  --color-usage-chart-3: #9e77ed;
+  --color-usage-chart-4: #e03131;
+  --color-usage-chart-5: #e07b00;
+  --color-usage-chart-6: #0aa7a7;
+  --color-context-breakdown-1: #0b7fff;
+  --color-context-breakdown-2: #338fff;
+  --color-context-breakdown-3: #5ca7ff;
+  --color-context-breakdown-4: #85bbff;
+  --color-context-breakdown-5: #acd0ff;
+  --color-context-breakdown-6: #c8ddff;
+  --color-context-breakdown-7: #e0ecff;
+  --color-usage-heatmap-0: color-mix(in oklab, #0b7fff 0%, var(--color-surface));
+  --color-usage-heatmap-1: color-mix(in oklab, #0b7fff 18%, var(--color-surface));
+  --color-usage-heatmap-2: color-mix(in oklab, #0b7fff 36%, var(--color-surface));
+  --color-usage-heatmap-3: color-mix(in oklab, #0b7fff 58%, var(--color-surface));
+  --color-usage-heatmap-4: color-mix(in oklab, #0066dd 82%, var(--color-surface));
+  --color-tab: #edf0eb;
+  --color-tab-active: #f5f6f3;
+  --color-tab-border: var(--color-border);
+  --color-menu: #ffffff;
+  --color-menu-hover: #edf0eb;
+  --color-primary: #202b23;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #dde3db;
+  --color-interaction-ask-surface: #ebf4ff;
+  --color-interaction-ask-foreground: #0066dd;
+  --color-interaction-ask-fill: rgba(70, 191, 114, 0.2);
+  --color-interaction-confirmation-surface: #eaf7ee;
+  --color-interaction-confirmation-foreground: #166b32;
+  --color-foreground: #202b23;
+  --color-foreground-subtle: #56655a;
+  --color-foreground-subtlest: color-mix(in oklab, #56655a 65%, transparent);
+  --color-foreground-inverse: #ffffff;
+  --color-success: #246b3e;
+  --color-success-foreground: #ffffff;
+  --color-idle-task: #9e77ed;
+  --color-idle-task-surface: #f5f3ff;
+  --color-destructive: #a3343b;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #81571c;
+  --color-feedback-privacy-hint: var(--color-yellow-600);
+  --color-warning-foreground: #ffffff;
+  --color-diff-added: #e1efe3;
+  --color-diff-added-foreground: #202b23;
+  --color-diff-removed: #fae4e6;
+  --color-diff-removed-foreground: #202b23;
+  --color-git-none: var(--color-foreground);
+  --color-git-modified: #e07b00;
+  --color-git-added: #1e8a3e;
+  --color-git-deleted: #e03131;
+  --color-git-renamed: #0b7fff;
+  --color-git-untracked: #1e8a3e;
+  --color-git-ignored: var(--color-foreground-subtlest);
+  --color-git-descendant: #e07b00;
+  --color-toast: #ffffff;
+  --color-tooltip: #edf0eb;
+  --color-tooltip-foreground: #202b23;
+  --color-tooltip-tag: #dde3db;
+  --color-tooltip-tag-foreground: #56655a;
+  --color-tag: #dde3db;
+  --color-file-node: rgba(26, 112, 184, 0.1);
+  --color-file-node-hover: rgba(26, 112, 184, 0.16);
+  --color-file-node-foreground: #1a70b8;
+  --color-skill-node: rgba(116, 83, 176, 0.1);
+  --color-skill-node-hover: rgba(116, 83, 176, 0.16);
+  --color-skill-node-foreground: #7453b0;
+  --color-command-node: rgba(86, 98, 112, 0.1);
+  --color-command-node-hover: rgba(86, 98, 112, 0.16);
+  --color-command-node-foreground: #566270;
+  --color-subagent-node: rgba(111, 122, 47, 0.1);
+  --color-subagent-node-hover: rgba(111, 122, 47, 0.16);
+  --color-subagent-node-foreground: #6f7a2f;
+  --color-session-node: rgba(20, 128, 122, 0.1);
+  --color-session-node-hover: rgba(20, 128, 122, 0.16);
+  --color-session-node-foreground: #14807a;
+  --color-plugin-node: rgba(184, 122, 26, 0.1);
+  --color-plugin-node-hover: rgba(184, 122, 26, 0.16);
+  --color-plugin-node-foreground: #b87a1a;
+  --color-plugin-paid-plan-badge: #ffe3c8;
+  --color-plugin-paid-plan-badge-foreground: #4b280f;
+}
+
+.theme-zai-dark {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #141916;
+  --color-background-win-alt: #252d28;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  /* Mesa Code accent identity: jade/emerald replaces the inherited monochrome brand. */
+  --color-brand: #82e4b7;
+  --color-trajectory-user: #60a5fa;
+  --color-trajectory-assistant: #2dd4bf;
+  --color-trajectory-reasoning: #a78bfa;
+  --color-trajectory-tool-call: #f59e0b;
+  --color-trajectory-tool-result: #38bdf8;
+  --color-workflow-rule: rgba(255, 255, 255, 0.065);
+  --color-workflow-trace: rgba(255, 255, 255, 0.35);
+  --color-workflow-trace-strong: rgba(255, 255, 255, 0.6);
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-find-highlight: #542500;
+  --color-find-highlight-active: #ff8a30;
+  --color-border: #3c4940;
+  --color-border-hover: #4d5e53;
+  --color-hover: rgba(237, 242, 238, 0.05);
+  --color-selected: rgba(237, 242, 238, 0.08);
+  --color-header: #1b211d;
+  --color-panel: #1b211d;
+  --color-sidebar: #1b211d;
+  --color-surface: #252d28;
+  --color-surface-hover: #2e3831;
+  --color-card: #252d28;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #1b211d;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #1b211d;
+  --color-popover-border: var(--color-border);
+  --color-input: #141916;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: var(--color-foreground);
+  --color-terminal-cursor: #f8f8f8;
+  --color-terminal-cursor-accent: #141916;
+  --color-terminal-selection: rgba(64, 153, 255, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #3c4940;
+  --color-terminal-red: #ff5c5c;
+  --color-terminal-green: #46bf72;
+  --color-terminal-yellow: #ff8a30;
+  --color-terminal-blue: #4099ff;
+  --color-terminal-magenta: #7b5ce5;
+  --color-terminal-cyan: #42c8c8;
+  --color-terminal-white: #adadad;
+  --color-terminal-bright-black: #747474;
+  --color-terminal-bright-red: #ff9999;
+  --color-terminal-bright-green: #87d9a4;
+  --color-terminal-bright-yellow: #ffb26b;
+  --color-terminal-bright-blue: #80beff;
+  --color-terminal-bright-magenta: #a888f2;
+  --color-terminal-bright-cyan: #8ee5e5;
+  --color-terminal-bright-white: #f8f8f8;
+  --color-usage-chart-1: #4099ff;
+  --color-usage-chart-2: #46bf72;
+  --color-usage-chart-3: #7b5ce5;
+  --color-usage-chart-4: #ff5c5c;
+  --color-usage-chart-5: #ff8a30;
+  --color-usage-chart-6: #42c8c8;
+  --color-context-breakdown-1: #4099ff;
+  --color-context-breakdown-2: #66adff;
+  --color-context-breakdown-3: #80beff;
+  --color-context-breakdown-4: #9dceff;
+  --color-context-breakdown-5: #b9ddff;
+  --color-context-breakdown-6: #d0e8ff;
+  --color-context-breakdown-7: #e4f1ff;
+  --color-usage-heatmap-0: color-mix(in oklab, #4099ff 0%, var(--color-surface));
+  --color-usage-heatmap-1: color-mix(in oklab, #4099ff 24%, var(--color-surface));
+  --color-usage-heatmap-2: color-mix(in oklab, #4099ff 42%, var(--color-surface));
+  --color-usage-heatmap-3: color-mix(in oklab, #4099ff 62%, var(--color-surface));
+  --color-usage-heatmap-4: color-mix(in oklab, #80beff 78%, var(--color-surface));
+  --color-tab: #1b211d;
+  --color-tab-active: #141916;
+  --color-tab-border: var(--color-border);
+  --color-menu: #1b211d;
+  --color-menu-hover: #252d28;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #000000;
+  --color-secondary: #252d28;
+  --color-interaction-ask-surface: #001d3d;
+  --color-interaction-ask-foreground: #80beff;
+  --color-interaction-ask-fill: rgba(70, 191, 114, 0.24);
+  --color-interaction-confirmation-surface: rgba(70, 191, 114, 0.16);
+  --color-interaction-confirmation-foreground: #87d9a4;
+  --color-foreground: #edf2ee;
+  --color-foreground-subtle: #aab8ae;
+  --color-foreground-subtlest: color-mix(in oklab, #aab8ae 50%, transparent);
+  --color-foreground-inverse: #141916;
+  --color-success: #9de7b4;
+  --color-success-foreground: #141916;
+  --color-idle-task: #7b5ce5;
+  --color-idle-task-surface: #160d38;
+  --color-destructive: #ffb2ab;
+  /* Zai Dark once set the destructive foreground to black, conflicting with the fixed white text design of red danger buttons. */
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-feedback-privacy-hint: var(--color-yellow-300);
+  --color-warning-foreground: #141916;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #edf2ee;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #edf2ee;
+  --color-git-none: var(--color-foreground);
+  --color-git-modified: #ff8a30;
+  --color-git-added: #46bf72;
+  --color-git-deleted: #ff5c5c;
+  --color-git-renamed: #4099ff;
+  --color-git-untracked: #46bf72;
+  --color-git-ignored: var(--color-foreground-subtlest);
+  --color-git-descendant: #ff8a30;
+  --color-toast: #252d28;
+  --color-tooltip: #252d28;
+  --color-tooltip-foreground: #edf2ee;
+  --color-tooltip-tag: #3c4940;
+  --color-tooltip-tag-foreground: #aab8ae;
+  --color-tag: #3c4940;
+  --color-file-node: rgba(112, 174, 224, 0.16);
+  --color-file-node-hover: rgba(112, 174, 224, 0.22);
+  --color-file-node-foreground: #8fc5ef;
+  --color-skill-node: rgba(166, 137, 218, 0.16);
+  --color-skill-node-hover: rgba(166, 137, 218, 0.22);
+  --color-skill-node-foreground: #bda5e6;
+  --color-command-node: rgba(154, 166, 180, 0.14);
+  --color-command-node-hover: rgba(154, 166, 180, 0.2);
+  --color-command-node-foreground: #b5c0cc;
+  --color-subagent-node: rgba(183, 189, 117, 0.16);
+  --color-subagent-node-hover: rgba(183, 189, 117, 0.22);
+  --color-subagent-node-foreground: #c8cd90;
+  --color-session-node: rgba(104, 196, 188, 0.16);
+  --color-session-node-hover: rgba(104, 196, 188, 0.22);
+  --color-session-node-foreground: #93d8d2;
+  --color-plugin-node: rgba(224, 174, 112, 0.16);
+  --color-plugin-node-hover: rgba(224, 174, 112, 0.22);
+  --color-plugin-node-foreground: #efc58f;
+  --color-plugin-paid-plan-badge: #5a341b;
+  --color-plugin-paid-plan-badge-foreground: #ffd8b8;
+}
+
+/*
+ * Black theme: a complete surface set on a pure-black base, not a darker copy of `.dark`.
+ * Every container is derived from #000 with small near-black steps so panels separate without
+ * turning grey, and the accent-derived tokens (selected / hover / card-selected / tab-active)
+ * stay as the fallback shape that the accent picker overrides through the root inline style.
+ */
+.theme-black {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.2);
+  --color-background: #080909;
+  --color-background-alt: #0a0b0a;
+  --color-background-win-alt: #101312;
+  --color-header: #101312;
+  --color-panel: #101312;
+  --color-sidebar: #080909;
+  --color-surface: #1b211e;
+  --color-surface-hover: #232a25;
+  --color-card: #1b211e;
+  --color-card-border: #3c4940;
+  --color-popover: #141917;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #101312;
+  --color-popover-border: #3c4940;
+  --color-menu: #141917;
+  --color-menu-hover: #1b211e;
+  --color-input: #080909;
+  --color-input-focused: #101312;
+  --color-input-border: #3c4940;
+  --color-input-border-hover: #4d5e53;
+  --color-tab: #101312;
+  --color-tab-active: #080909;
+  --color-tab-border: #3c4940;
+  --color-border: #3c4940;
+  --color-border-hover: #4d5e53;
+  --color-hover: rgba(239, 244, 240, 0.06);
+  --color-selected: rgba(239, 244, 240, 0.08);
+  --color-card-selected: #1b211e;
+  /* Black fallback accent surface. The accent picker replaces these through root inline styles. */
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-brand: #82e4b7;
+  --color-ring: var(--color-brand);
+  --color-primary: var(--color-brand);
+  --color-primary-foreground: #080909;
+  --color-input-border-focused: var(--color-brand);
+  --color-foreground: #eff4f0;
+  --color-foreground-subtle: #abb9b0;
+  --color-foreground-subtlest: color-mix(in oklab, #abb9b0 50%, transparent);
+  --color-foreground-inverse: #080909;
+  --color-terminal-bg: #080909;
+  --color-terminal-fg: #eff4f0;
+  --color-terminal-cursor: #eff4f0;
+  --color-terminal-cursor-accent: #080909;
+  --color-terminal-selection: color-mix(in oklab, #82e4b7 28%, transparent);
+  --color-terminal-selection-inactive: color-mix(
+    in oklab,
+    var(--color-white) 14%,
+    transparent
+  );
+  --color-toast: #1b211e;
+  --color-tooltip: #1b211e;
+  --color-tooltip-foreground: #eff4f0;
+  --color-tooltip-tag: #3c4940;
+  --color-tooltip-tag-foreground: #abb9b0;
+  --color-tag: #3c4940;
+  --color-secondary: #1b211e;
+  --color-success: #9de7b4;
+  --color-success-foreground: #080909;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #080909;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #eff4f0;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #eff4f0;
+}
+
+/*
+ * Catalogue themes: each has its own tinted surface palette derived from the mockup.
+ * They extend the dark base (`.dark`) with full surface, foreground, and semantic overrides.
+ */
+
+.theme-midnight {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #111725;
+  --color-background-win-alt: #232e43;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: #3e506b;
+  --color-border-hover: #506583;
+  --color-hover: rgba(234, 240, 255, 0.05);
+  --color-selected: rgba(234, 240, 255, 0.08);
+  --color-header: #182032;
+  --color-panel: #182032;
+  --color-sidebar: #182032;
+  --color-surface: #232e43;
+  --color-surface-hover: #2c3850;
+  --color-card: #232e43;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #182032;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #182032;
+  --color-popover-border: var(--color-border);
+  --color-input: #111725;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: #eaf0ff;
+  --color-terminal-cursor: #eaf0ff;
+  --color-terminal-cursor-accent: #111725;
+  --color-terminal-selection: rgba(64, 153, 255, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #3e506b;
+  --color-tab: #182032;
+  --color-tab-active: #111725;
+  --color-tab-border: var(--color-border);
+  --color-menu: #182032;
+  --color-menu-hover: #232e43;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #111725;
+  --color-secondary: #232e43;
+  --color-foreground: #eaf0ff;
+  --color-foreground-subtle: #b0bdd4;
+  --color-foreground-subtlest: color-mix(in oklab, #b0bdd4 50%, transparent);
+  --color-foreground-inverse: #111725;
+  --color-success: #9de7b4;
+  --color-success-foreground: #111725;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #111725;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #eaf0ff;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #eaf0ff;
+  --color-toast: #232e43;
+  --color-tooltip: #232e43;
+  --color-tooltip-foreground: #eaf0ff;
+  --color-tooltip-tag: #3e506b;
+  --color-tooltip-tag-foreground: #b0bdd4;
+  --color-tag: #3e506b;
+  --color-idle-task: #7b5ce5;
+  --color-idle-task-surface: #1a1040;
+}
+
+.theme-ocean {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #101e25;
+  --color-background-win-alt: #203942;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: #3b5963;
+  --color-border-hover: #4d6e79;
+  --color-hover: rgba(230, 244, 247, 0.05);
+  --color-selected: rgba(230, 244, 247, 0.08);
+  --color-header: #162a33;
+  --color-panel: #162a33;
+  --color-sidebar: #162a33;
+  --color-surface: #203942;
+  --color-surface-hover: #29444e;
+  --color-card: #203942;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #162a33;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #162a33;
+  --color-popover-border: var(--color-border);
+  --color-input: #101e25;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: #e6f4f7;
+  --color-terminal-cursor: #e6f4f7;
+  --color-terminal-cursor-accent: #101e25;
+  --color-terminal-selection: rgba(64, 153, 255, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #3b5963;
+  --color-tab: #162a33;
+  --color-tab-active: #101e25;
+  --color-tab-border: var(--color-border);
+  --color-menu: #162a33;
+  --color-menu-hover: #203942;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #101e25;
+  --color-secondary: #203942;
+  --color-foreground: #e6f4f7;
+  --color-foreground-subtle: #acc9d0;
+  --color-foreground-subtlest: color-mix(in oklab, #acc9d0 50%, transparent);
+  --color-foreground-inverse: #101e25;
+  --color-success: #9de7b4;
+  --color-success-foreground: #101e25;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #101e25;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #e6f4f7;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #e6f4f7;
+  --color-toast: #203942;
+  --color-tooltip: #203942;
+  --color-tooltip-foreground: #e6f4f7;
+  --color-tooltip-tag: #3b5963;
+  --color-tooltip-tag-foreground: #acc9d0;
+  --color-tag: #3b5963;
+  --color-idle-task: #7b5ce5;
+  --color-idle-task-surface: #160d38;
+}
+
+.theme-forest {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #142019;
+  --color-background-win-alt: #283d2e;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: #445e49;
+  --color-border-hover: #56735c;
+  --color-hover: rgba(237, 245, 233, 0.05);
+  --color-selected: rgba(237, 245, 233, 0.08);
+  --color-header: #1c2c22;
+  --color-panel: #1c2c22;
+  --color-sidebar: #1c2c22;
+  --color-surface: #283d2e;
+  --color-surface-hover: #324838;
+  --color-card: #283d2e;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #1c2c22;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #1c2c22;
+  --color-popover-border: var(--color-border);
+  --color-input: #142019;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: #edf5e9;
+  --color-terminal-cursor: #edf5e9;
+  --color-terminal-cursor-accent: #142019;
+  --color-terminal-selection: rgba(64, 153, 255, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #445e49;
+  --color-tab: #1c2c22;
+  --color-tab-active: #142019;
+  --color-tab-border: var(--color-border);
+  --color-menu: #1c2c22;
+  --color-menu-hover: #283d2e;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #142019;
+  --color-secondary: #283d2e;
+  --color-foreground: #edf5e9;
+  --color-foreground-subtle: #b0c8b3;
+  --color-foreground-subtlest: color-mix(in oklab, #b0c8b3 50%, transparent);
+  --color-foreground-inverse: #142019;
+  --color-success: #9de7b4;
+  --color-success-foreground: #142019;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #142019;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #edf5e9;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #edf5e9;
+  --color-toast: #283d2e;
+  --color-tooltip: #283d2e;
+  --color-tooltip-foreground: #edf5e9;
+  --color-tooltip-tag: #445e49;
+  --color-tooltip-tag-foreground: #b0c8b3;
+  --color-tag: #445e49;
+  --color-idle-task: #7b5ce5;
+  --color-idle-task-surface: #160d38;
+}
+
+.theme-purple {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #1e1728;
+  --color-background-win-alt: #392c46;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: #604c73;
+  --color-border-hover: #745f88;
+  --color-hover: rgba(243, 238, 250, 0.05);
+  --color-selected: rgba(243, 238, 250, 0.08);
+  --color-header: #291f36;
+  --color-panel: #291f36;
+  --color-sidebar: #291f36;
+  --color-surface: #392c46;
+  --color-surface-hover: #443653;
+  --color-card: #392c46;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #291f36;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #291f36;
+  --color-popover-border: var(--color-border);
+  --color-input: #1e1728;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: #f3eefa;
+  --color-terminal-cursor: #f3eefa;
+  --color-terminal-cursor-accent: #1e1728;
+  --color-terminal-selection: rgba(200, 179, 255, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #604c73;
+  --color-tab: #291f36;
+  --color-tab-active: #1e1728;
+  --color-tab-border: var(--color-border);
+  --color-menu: #291f36;
+  --color-menu-hover: #392c46;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #1e1728;
+  --color-secondary: #392c46;
+  --color-foreground: #f3eefa;
+  --color-foreground-subtle: #c8b8d8;
+  --color-foreground-subtlest: color-mix(in oklab, #c8b8d8 50%, transparent);
+  --color-foreground-inverse: #1e1728;
+  --color-success: #9de7b4;
+  --color-success-foreground: #1e1728;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #1e1728;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #f3eefa;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #f3eefa;
+  --color-toast: #392c46;
+  --color-tooltip: #392c46;
+  --color-tooltip-foreground: #f3eefa;
+  --color-tooltip-tag: #604c73;
+  --color-tooltip-tag-foreground: #c8b8d8;
+  --color-tag: #604c73;
+  --color-idle-task: #c8b3ff;
+  --color-idle-task-surface: #291f36;
+}
+
+.theme-rose {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #261b20;
+  --color-background-win-alt: #44333b;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: #69515c;
+  --color-border-hover: #7e6470;
+  --color-hover: rgba(255, 240, 243, 0.05);
+  --color-selected: rgba(255, 240, 243, 0.08);
+  --color-header: #33252c;
+  --color-panel: #33252c;
+  --color-sidebar: #33252c;
+  --color-surface: #44333b;
+  --color-surface-hover: #503d46;
+  --color-card: #44333b;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #33252c;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #33252c;
+  --color-popover-border: var(--color-border);
+  --color-input: #261b20;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: #fff0f3;
+  --color-terminal-cursor: #fff0f3;
+  --color-terminal-cursor-accent: #261b20;
+  --color-terminal-selection: rgba(255, 178, 202, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #69515c;
+  --color-tab: #33252c;
+  --color-tab-active: #261b20;
+  --color-tab-border: var(--color-border);
+  --color-menu: #33252c;
+  --color-menu-hover: #44333b;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #261b20;
+  --color-secondary: #44333b;
+  --color-foreground: #fff0f3;
+  --color-foreground-subtle: #d7bbc5;
+  --color-foreground-subtlest: color-mix(in oklab, #d7bbc5 50%, transparent);
+  --color-foreground-inverse: #261b20;
+  --color-success: #9de7b4;
+  --color-success-foreground: #261b20;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #261b20;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #fff0f3;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #fff0f3;
+  --color-toast: #44333b;
+  --color-tooltip: #44333b;
+  --color-tooltip-foreground: #fff0f3;
+  --color-tooltip-tag: #69515c;
+  --color-tooltip-tag-foreground: #d7bbc5;
+  --color-tag: #69515c;
+  --color-idle-task: #ff8eb3;
+  --color-idle-task-surface: #33252c;
+}
+
+.theme-amber {
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: #252018;
+  --color-background-win-alt: #443a2b;
+  --color-background-alt: color-mix(in oklab, var(--color-background-win-alt) 60%, transparent);
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: #665a45;
+  --color-border-hover: #7c6e57;
+  --color-hover: rgba(250, 241, 226, 0.05);
+  --color-selected: rgba(250, 241, 226, 0.08);
+  --color-header: #332b20;
+  --color-panel: #332b20;
+  --color-sidebar: #332b20;
+  --color-surface: #443a2b;
+  --color-surface-hover: #504434;
+  --color-card: #443a2b;
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: #332b20;
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: #332b20;
+  --color-popover-border: var(--color-border);
+  --color-input: #252018;
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: var(--color-background);
+  --color-terminal-fg: #faf1e2;
+  --color-terminal-cursor: #faf1e2;
+  --color-terminal-cursor-accent: #252018;
+  --color-terminal-selection: rgba(247, 213, 140, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #665a45;
+  --color-tab: #332b20;
+  --color-tab-active: #252018;
+  --color-tab-border: var(--color-border);
+  --color-menu: #332b20;
+  --color-menu-hover: #443a2b;
+  --color-primary: #ffffff;
+  --color-primary-foreground: #252018;
+  --color-secondary: #443a2b;
+  --color-foreground: #faf1e2;
+  --color-foreground-subtle: #d1c1a6;
+  --color-foreground-subtlest: color-mix(in oklab, #d1c1a6 50%, transparent);
+  --color-foreground-inverse: #252018;
+  --color-success: #9de7b4;
+  --color-success-foreground: #252018;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #252018;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #faf1e2;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #faf1e2;
+  --color-toast: #443a2b;
+  --color-tooltip: #443a2b;
+  --color-tooltip-foreground: #faf1e2;
+  --color-tooltip-tag: #665a45;
+  --color-tooltip-tag-foreground: #d1c1a6;
+  --color-tag: #665a45;
+  --color-idle-task: #f7d58c;
+  --color-idle-task-surface: #332b20;
+}
+
+/*
+ * Previously only the task list customized its scrollbar; other panels, dropdown lists, and code areas kept the system default,
+ * so thickness, corner radius, and track background were inconsistent within one interface. Here this transparent track + rounded thumb
+ * is promoted to a global native scrollbar style so desktop/web and light/dark themes look consistent.
+ */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  min-width: 32px;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background: var(--color-border);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/*
+ * xterm's own viewport picks up the global scrollbar style, exposing a separate scrollbar on the right of the terminal.
+ * Terminal scrolling stays inside xterm; here we only hide the native scrollbar to avoid extra visual noise in the terminal panel.
+ */
+.terminal-xterm-shell .xterm-viewport {
+  scrollbar-width: none;
+}
+
+.terminal-xterm-shell .xterm-viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/*
+ * pptx slides are rendered at intrinsic size then displayed with a transform scale, so slight overflow of inner elements such as text boxes
+ * hits the global scrollbar style above and exposes a scrollbar inside the slide. Slide content has no user scrolling interaction,
+ * so here we hide native scrollbars inside the render surface entirely.
+ */
+[data-mesa-code-pptx-render-surface] * {
+  scrollbar-width: none;
+}
+
+[data-mesa-code-pptx-render-surface] *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@layer utilities {
+  .button-gradient {
+    background-image: linear-gradient(to bottom right, #191a1d, #747689);
+  }
+
+  .dark .button-gradient {
+    background-image: none;
+    background-color: #484a58;
+  }
+
+  .animated-gradient-text {
+    display: inline-block;
+    background: linear-gradient(
+      90deg,
+      var(--animated-gradient-text-strong) 0%,
+      var(--animated-gradient-text-strong) 34%,
+      var(--animated-gradient-text-soft) 50%,
+      var(--animated-gradient-text-strong) 66%,
+      var(--animated-gradient-text-strong) 100%
+    );
+    background-size: 300% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-flow 4s linear infinite;
+    will-change: background-position;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  .animated-gradient-text-subtle {
+    --animated-gradient-text-strong: var(--color-foreground-subtle);
+  }
+
+  .cua-group-gradient-text {
+    display: inline-block;
+    background: linear-gradient(
+      90deg,
+      var(--animated-gradient-text-strong) 0%,
+      var(--animated-gradient-text-soft) 40%,
+      var(--animated-gradient-text-soft) 60%,
+      var(--animated-gradient-text-strong) 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: cua-group-gradient-flow 1s linear infinite;
+    animation-delay: 0.5s;
+    will-change: background-position;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  @keyframes cua-group-gradient-flow {
+    0% {
+      background-position: 100% 0;
+    }
+
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cua-group-gradient-text {
+      animation: none;
+    }
+  }
+
+  @keyframes gradient-flow {
+    0% {
+      background-position: 100% 0;
+    }
+
+    50% {
+      background-position: 0% 0;
+    }
+
+    100% {
+      background-position: 0% 0;
+    }
+  }
+}
+
+@keyframes mesa-code-stream-text-in {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes mesa-code-draft-prompt-waterfall {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0);
+  }
+}
+
+.mesa-code-draft-prompt-waterfall {
+  animation: mesa-code-draft-prompt-waterfall 260ms cubic-bezier(0.22, 1, 0.36, 1)
+    var(--mesa-code-draft-prompt-waterfall-delay, 0ms) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-code-draft-prompt-waterfall {
+    animation: none;
+  }
+}
+
+@keyframes markdown-image-loading-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.markdown-image-loading-shimmer {
+  background-color: var(--color-card);
+  background-image: linear-gradient(
+    135deg,
+    var(--color-card) 0%,
+    var(--color-background) 50%,
+    var(--color-card) 100%
+  );
+  background-size: 240% 100%;
+  animation: markdown-image-loading-shimmer 1.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-image-loading-shimmer {
+    animation: none;
+  }
+}
+
+@keyframes mesa-code-stream-marker-in {
+  0% {
+    color: transparent;
+  }
+
+  100% {
+    color: var(--color-foreground-subtlest);
+  }
+}
+
+[data-mesa-code-stream-animate="true"] {
+  animation: mesa-code-stream-text-in 900ms cubic-bezier(0.16, 1, 0.3, 1)
+    var(--mesa-code-stream-animation-delay, 0ms) both;
+  will-change: opacity;
+}
+
+[data-mesa-code-stream-marker-animate="true"]::marker {
+  animation: mesa-code-stream-marker-in 900ms cubic-bezier(0.16, 1, 0.3, 1)
+    var(--mesa-code-stream-animation-delay, 0ms) both;
+}
+
+[data-mesa-code-tool-stream-animate="true"],
+[data-mesa-code-chat-loading-animate="true"] {
+  animation: mesa-code-stream-text-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
+}
+
+/*  Radix Collapsible writes inline animation-name:none while measuring the closed height.
+   The assistant history section needs the height animation to keep playing during delayed auto-collapse unmount,
+   so here we use !important to override the Radix inline style, scoped to explicitly marked collapse windows only. */
+[data-mesa-code-collapsible-animate-close="true"][data-state="closed"] {
+  animation: mesa-code-collapsible-up 300ms ease-in-out forwards !important;
+}
+
+[data-mesa-code-collapsible-animate-close="true"][data-state="closed"] > * {
+  animation: mesa-code-collapsible-fade-out 300ms ease-in-out forwards !important;
+}
+
+@keyframes mesa-code-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+
+  to {
+    height: 0;
+  }
+}
+
+@keyframes mesa-code-collapsible-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mesa-code-stream-animate="true"],
+  [data-mesa-code-stream-marker-animate="true"]::marker,
+  [data-mesa-code-tool-stream-animate="true"],
+  [data-mesa-code-chat-loading-animate="true"],
+  [data-mesa-code-collapsible-animate-close="true"][data-state="closed"],
+  [data-mesa-code-collapsible-animate-close="true"][data-state="closed"] > * {
+    animation: none;
+  }
+}
+
+/* Feedback animation on like/dislike selection: following WeChat/X, only two beats — icon bounce plus tiny particle scatter.
+   Particles are drawn with box-shadow on ::after and follow currentColor: zero extra DOM, no new colors. */
+.mesa-code-reaction-burst {
+  position: relative;
+  display: inline-flex;
+}
+
+.mesa-code-reaction-burst > svg {
+  animation: mesa-code-reaction-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mesa-code-reaction-burst::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  animation: mesa-code-reaction-particles 560ms cubic-bezier(0.16, 1, 0.3, 1) 60ms forwards;
+}
+
+.animate-mesa-code-alarm-ring {
+  animation: mesa-code-alarm-ring 600ms ease-in-out infinite;
+}
+
+@keyframes mesa-code-alarm-ring {
+  0%,
+  100% {
+    transform: rotate(-10deg);
+  }
+
+  50% {
+    transform: rotate(10deg);
+  }
+}
+
+@keyframes mesa-code-reaction-pop {
+  0% {
+    transform: scale(0);
+  }
+
+  45% {
+    transform: scale(1.3);
+  }
+
+  70% {
+    transform: scale(0.95);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes mesa-code-reaction-particles {
+  0% {
+    opacity: 0;
+    box-shadow:
+      7.7px 2.1px 0 0,
+      2.1px 7.7px 0 0,
+      -5.7px 5.7px 0 0,
+      -7.7px -2.1px 0 0,
+      -2.1px -7.7px 0 0,
+      5.7px -5.7px 0 0;
+  }
+
+  20% {
+    opacity: 0.7;
+  }
+
+  100% {
+    opacity: 0;
+    box-shadow:
+      15.5px 4.1px 0 -1px,
+      4.1px 15.5px 0 -1px,
+      -11.3px 11.3px 0 -1px,
+      -15.5px -4.1px 0 -1px,
+      -4.1px -15.5px 0 -1px,
+      11.3px -11.3px 0 -1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-code-reaction-burst > svg,
+  .mesa-code-reaction-burst::after {
+    animation: none;
+  }
+}
+
+@keyframes workspace-remote-connecting-breathe {
+  0%,
+  100% {
+    background-color: color-mix(in oklab, var(--color-brand) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-brand) 10%, transparent);
+  }
+
+  50% {
+    background-color: color-mix(in oklab, var(--color-brand) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-brand) 18%, transparent);
+  }
+}
+
+@keyframes mesa-code-task-interaction-countdown {
+  from {
+    transform: scaleX(var(--mesa-code-interaction-progress, 1));
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.mesa-code-task-interaction-countdown-fill {
+  animation: mesa-code-task-interaction-countdown var(--mesa-code-interaction-remaining-ms, 240000ms) linear
+    forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-code-task-interaction-countdown-fill {
+    animation: none;
+    transform: scaleX(var(--mesa-code-interaction-progress, 1));
+  }
+}
+
+.workspace-remote-connecting-breathe {
+  animation: workspace-remote-connecting-breathe 1.8s ease-in-out infinite;
+}
+
+.mesa-code-update-charge-progress [data-slot="progress-indicator"] {
+  position: relative;
+  overflow: hidden;
+}
+
+.mesa-code-update-charge-progress [data-slot="progress-indicator"]::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  top: 0;
+  width: min(3.5rem, 70%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-primary-foreground) 62%, transparent),
+    transparent
+  );
+  animation: mesa-code-update-charge-sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  transform: translateX(-120%);
+}
+
+@keyframes mesa-code-update-charge-sweep {
+  0% {
+    opacity: 0.35;
+    transform: translateX(-120%);
+  }
+
+  50% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0.35;
+    transform: translateX(260%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-code-update-charge-progress [data-slot="progress-indicator"]::after {
+    animation: none;
+    opacity: 0.2;
+    transform: none;
+  }
+}
+
+/*
+ *  Generic animate-pulse only changes opacity of a 14px SVG on a 2s cycle; although it is running,
+ * it looks almost static. Attaching the dedicated breathing animation to the icon wrapper changes opacity and scale together, keeping the running state perceivable.
+ */
+@keyframes browser-use-operation-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+.browser-use-operation-breathe {
+  transform-origin: center;
+  animation: browser-use-operation-breathe 900ms ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+/*
+ * When a resize happens during Browser Use execution, dim the webview guest directly so the hint does not just float over a complex page.
+ * filter adds no click mask and the address bar is outside this node, so automated actions and user control stay usable.
+ */
+.browser-use-viewport {
+  transition: filter 160ms ease-out;
+}
+
+.browser-use-viewport[data-browser-resize-dimmed="true"] {
+  filter: brightness(0.88);
+  will-change: filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-use-operation-breathe {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+
+  .browser-use-viewport {
+    transition: none;
+  }
+}
+
+@keyframes task-search-result-highlight {
+  0% {
+    background-color: color-mix(in oklab, var(--color-brand) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-brand) 28%, transparent);
+  }
+
+  45% {
+    background-color: color-mix(in oklab, var(--color-brand) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-brand) 20%, transparent);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+
+.task-search-result-highlight {
+  animation: task-search-result-highlight 1.2s ease-out both;
+}
+
+@keyframes fork-highlight-pulse {
+  0% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+  20% {
+    background-color: color-mix(in oklab, var(--color-brand) 24%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-brand) 32%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+
+[data-fork-highlight="true"] {
+  animation: fork-highlight-pulse 1.6s ease-out 1;
+  border-radius: 0.5rem;
+}
+
+/* Marquee text entering and leaving on both sides keeps only the right fade, which leaves a hard cut at the left edge. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .task-title-marquee:hover .task-title-marquee-track {
+    will-change: transform;
+  }
+}
+
+/* Workflow diagram · marching edge: the edge the control flow takes into the running station
+ * is **lit and still** — it speaks of the past (control flow took this edge); the motion belongs to the running lamp (wf-beat below).
+ * The light is the lamp color, brightest at the lamp end and fading toward where control flow came from, as if the lamp lit the road it came by. Previously it was a warning-colored dashed line
+ * scrolling along the edge, which read as "still travelling from the previous station to this one".
+ * The flat track is a border, with the light stacked on ::after: 1.5px, round cap, from fully transparent at the far end to full color at 80%, and the right end overshoots the track
+ * by 4px to meet the glow. SVG edges (arcs, fork/join curves, ridge curves) are drawn by WorkflowMarchLight.tsx as a
+ * .wf-lit path with a stroke gradient laid end to end along the path. All of it is still ink; nothing changes under reduced-motion.
+ */
+.wf-rail-march::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: -4px;
+  top: -1.25px;
+  height: 1.5px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--color-warning) 80%);
+}
+.wf-lit {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* Sidebar ridge: the marching segment is two 1.5px vertical bars, gradient chosen by
+ * data-rail-position — the lower half of the previous section fades in from transparent to 70%, and the upper half of the running section rises from 70% to full and stays lit into
+ * the lamp; a full section passed through stays flat at 70%. The ridge lamp shares the same class as the card lamp (wf-lamp-running) and pulses together.
+ */
+.wf-spine-march[data-rail-position="below"] {
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in oklab, var(--color-warning) 70%, transparent)
+  );
+}
+.wf-spine-march[data-rail-position="above"] {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-warning) 70%, transparent),
+    var(--color-warning)
+  );
+}
+.wf-spine-march[data-rail-position="full"] {
+  background: color-mix(in oklab, var(--color-warning) 70%, transparent);
+}
+
+/* Workflow timeline · motion vocabulary: four durations
+ * on one curve, shared by cards, confirm dialogs, and the sidebar list. Arrival / pop-in / expand / word swap animate opacity and transform only,
+ * lamps and ink animate color only; layout properties never move. Under reduced-motion everything goes to zero and loops rest on a still frame.
+ */
+.wf-motion {
+  --wf-t-fast: 120ms;
+  --wf-t-base: 160ms;
+  --wf-t-enter: 200ms;
+  --wf-t-ink: 320ms;
+  --wf-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Heartbeat cycle of the running lamp; shared by ridge and card. */
+  --wf-beat: 1.6s;
+}
+.wf-pill {
+  box-shadow: inset 0 0 0 1px transparent;
+  transition:
+    background-color var(--wf-t-base) var(--wf-ease),
+    box-shadow var(--wf-t-base) var(--wf-ease),
+    transform var(--wf-t-fast) var(--wf-ease);
+}
+.wf-pill-avatar {
+  transition:
+    transform var(--wf-t-base) var(--wf-ease),
+    background-color var(--wf-t-base) var(--wf-ease);
+}
+.wf-pill-name {
+  transition: color var(--wf-t-base) var(--wf-ease);
+}
+.wf-pill-go {
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--wf-t-base) var(--wf-ease),
+    transform var(--wf-t-base) var(--wf-ease),
+    color var(--wf-t-base) var(--wf-ease);
+}
+.wf-pill-open:hover,
+.wf-pill-open:focus-visible {
+  background-color: var(--color-surface-hover);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--wf-avatar, var(--color-border-hover)) 35%, transparent);
+}
+/* Agent capsules give hover feedback with background color only, avoiding a colored outline stealing the status hierarchy. */
+.wf-agent-pill:hover {
+  box-shadow: none;
+}
+.wf-pill-open:hover .wf-pill-avatar,
+.wf-pill-open:focus-visible .wf-pill-avatar {
+  transform: scale(1.08);
+  background-color: color-mix(
+    in oklab,
+    var(--wf-avatar, var(--color-border-hover)) 30%,
+    transparent
+  );
+}
+.wf-pill-open:hover .wf-pill-name,
+.wf-pill-open:focus-visible .wf-pill-name {
+  color: var(--color-foreground);
+}
+.wf-pill-open:hover .wf-pill-go,
+.wf-pill-open:focus-visible .wf-pill-go {
+  opacity: 1;
+  transform: none;
+  color: var(--color-foreground-subtle);
+}
+/* Square tiles for artifact pills: ink grey, lifted to the hover color on hover with the glyph turning foreground; unlike avatars they do not
+ * scale up — shape says "what", it does not steal the show from color saying "who". */
+.wf-pill-tile {
+  transition:
+    background-color var(--wf-t-base) var(--wf-ease),
+    color var(--wf-t-base) var(--wf-ease);
+}
+.wf-pill-open:hover .wf-pill-tile,
+.wf-pill-open:focus-visible .wf-pill-tile {
+  background-color: var(--color-hover);
+  color: var(--color-foreground);
+}
+/* In the tail slot, ↗ replaces the status marker: the marker shrinks out and the arrow shrinks in, same cell, same beat. */
+.wf-pill-open:hover .wf-mark,
+.wf-pill-open:focus-visible .wf-mark {
+  opacity: 0;
+  transform: scale(0.6);
+}
+.wf-pill-open:active {
+  transform: scale(0.985);
+}
+/* The "n more" row (appended note "five pills and a door"): three faces stacked with a background-colored outline each so they separate, fanning out
+ * two steps on hover. It is a door, not a status, so ↗ is present without waiting for hover (no status marker to yield to; an empty tail slot reads as "nothing"). */
+.wf-more-face {
+  border-radius: 35%;
+  box-shadow: 0 0 0 1.5px var(--color-background);
+  transition: margin-left var(--wf-t-base) var(--wf-ease);
+}
+.wf-more-deck > * + * {
+  margin-left: -5px;
+}
+.wf-more-row:hover .wf-more-deck > * + *,
+.wf-more-row:focus-visible .wf-more-deck > * + * {
+  margin-left: -2px;
+}
+.wf-pill-go-rest {
+  opacity: 1;
+  transform: none;
+}
+/* Segment width of the mini bar (appended note "phase roster") transitions with the count, read as "a few more settled". */
+.wf-meter-seg {
+  transition: flex-grow var(--wf-t-ink) var(--wf-ease);
+}
+/* Artifact tiles on completed cards: on hover the preview frame border
+ * lifts to the hover color, the kind tile and name in the caption row turn foreground, and ↗ in the tail slot replaces the version number — the same grammar as pills,
+ * except the "lift" lands on the preview frame instead of the whole background.
+ * Structure (see the WorkflowArtifactTile file header): the preview frame is a **sibling** of the button, and the button covers the whole tile with ::after
+ * to catch clicks; so the frame's hover state reads the button state from the tile container via :has(), and the focus ring is drawn on the container too.
+ */
+.wf-tile-hit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+}
+.wf-tile:has(.wf-tile-hit:focus-visible) {
+  outline: 2px solid color-mix(in oklab, var(--color-ring) 40%, transparent);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+.wf-tile-frame {
+  transition:
+    border-color var(--wf-t-base) var(--wf-ease),
+    transform var(--wf-t-fast) var(--wf-ease);
+}
+.wf-tile:has(.wf-tile-open:hover) .wf-tile-frame,
+.wf-tile:has(.wf-tile-open:focus-visible) .wf-tile-frame {
+  border-color: var(--color-border-hover);
+}
+.wf-tile-open:hover .wf-pill-tile,
+.wf-tile-open:focus-visible .wf-pill-tile {
+  background-color: var(--color-hover);
+  color: var(--color-foreground);
+}
+.wf-tile-open:hover .wf-pill-go,
+.wf-tile-open:focus-visible .wf-pill-go {
+  opacity: 1;
+  transform: none;
+  color: var(--color-foreground-subtle);
+}
+.wf-tile-open:hover .wf-mark,
+.wf-tile-open:focus-visible .wf-mark {
+  opacity: 0;
+  transform: scale(0.6);
+}
+.wf-tile:has(.wf-tile-open:active) .wf-tile-frame {
+  transform: scale(0.99);
+}
+/* Artifact index rows: the remaining artifacts after the deliverable row are
+ * text rows, not frames. On hover / focus the whole row fills with surface-hover (like sidebar rows), the kind icon turns foreground, and ↗ in the tail slot replaces the version number —
+ * the same grammar as pills, just without background or outline: lifting a text row needs only one fill layer. The "N more" row is
+ * a door, so ↗ is present without waiting for hover (wf-pill-go-rest).
+ */
+.wf-line {
+  transition: background-color var(--wf-t-base) var(--wf-ease);
+}
+.wf-line-icon {
+  transition: color var(--wf-t-base) var(--wf-ease);
+}
+.wf-line-open:hover,
+.wf-line-open:focus-visible {
+  background-color: var(--color-surface-hover);
+}
+.wf-line-open:hover .wf-line-icon,
+.wf-line-open:focus-visible .wf-line-icon {
+  color: var(--color-foreground);
+}
+.wf-line-open:hover .wf-pill-go,
+.wf-line-open:focus-visible .wf-pill-go {
+  opacity: 1;
+  transform: none;
+  color: var(--color-foreground-subtle);
+}
+.wf-line-open:hover .wf-mark,
+.wf-line-open:focus-visible .wf-mark {
+  opacity: 0;
+  transform: scale(0.6);
+}
+/* Document thumbnails in the preview area: laid out at 2x then scaled to half — a thumbnail of the content, not a smaller UI font size.
+ * Both the box width **and height** are scaled up by the factor and back into the frame: widening without heightening leaves the scaled box covering only the top half of the frame, with the bottom half blank. */
+.wf-preview-doc {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  transform: scale(0.5);
+  transform-origin: top left;
+  padding: 22px 26px;
+  overflow: hidden;
+  animation: wf-arrive var(--wf-t-ink, 320ms) var(--wf-ease, ease);
+}
+.wf-station {
+  transition: color var(--wf-t-base) var(--wf-ease);
+}
+.wf-lamp {
+  transition:
+    background-color var(--wf-t-ink) var(--wf-ease),
+    border-color var(--wf-t-ink) var(--wf-ease),
+    box-shadow var(--wf-t-base) var(--wf-ease);
+}
+/*
+ * Running lamp: a constant 3px glow plus a heartbeat every 1.6s (wf-beat) — the lamp swells to 1.12x
+ * and falls back, while a ring is emitted from the glow edge and fades out at 8px outside the lamp. The ring is a second box-shadow layer, transparent when still; the lamp is the only
+ * thing on the page running a clock. Under reduced-motion only the constant glow remains.
+ */
+.wf-lamp-running {
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--color-warning) 20%, transparent),
+    0 0 0 3px transparent;
+}
+.wf-station-open:hover .wf-lamp[data-lamp="pending"] {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-foreground) 10%, transparent);
+}
+.wf-station-open:hover .wf-lamp[data-lamp="done"] {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success) 18%, transparent);
+}
+.wf-station-open:hover .wf-lamp[data-lamp="failed"] {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-destructive) 18%, transparent);
+}
+.wf-ink {
+  transition:
+    stroke var(--wf-t-ink) var(--wf-ease),
+    fill var(--wf-t-ink) var(--wf-ease),
+    border-color var(--wf-t-ink) var(--wf-ease);
+}
+/* The entrance animation has no fill: only the from frame is declared, and it hands back to the hover transition when done (marker yielding, press scaling). */
+.wf-arrive {
+  animation: wf-arrive var(--wf-t-enter) var(--wf-ease);
+}
+.wf-mark {
+  transform-origin: center;
+  animation: wf-mark 180ms var(--wf-ease);
+  transition:
+    opacity var(--wf-t-base) var(--wf-ease),
+    transform var(--wf-t-base) var(--wf-ease);
+}
+.wf-unfold {
+  animation: wf-unfold var(--wf-t-enter) var(--wf-ease);
+}
+.wf-swap {
+  display: inline-block;
+  animation: wf-swap var(--wf-t-enter) var(--wf-ease);
+}
+.wf-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: wf-draw 420ms var(--wf-ease) forwards;
+}
+.wf-caret {
+  animation: wf-caret 1s step-end infinite;
+}
+/* Draft pen: the track segment extends from the left, the lamp lands, then the name is written out character by character. */
+.wf-rail-grow {
+  transform-origin: left center;
+  animation: wf-rail-grow var(--wf-t-base) var(--wf-ease);
+}
+.wf-land {
+  animation: wf-land var(--wf-t-enter) var(--wf-ease);
+}
+/* Round tail summary: on expand / collapse the outer frame height transitions between two values; on expand pills mount and
+ * land one after another (wf-arrive + 30 ms stagger), while collapsing only shrinks the height. */
+.wf-digest-plot {
+  transition: height var(--wf-t-ink) var(--wf-ease);
+}
+/* Edge eave: the timeline scrolls freely with the native scrollbar hidden;
+ * stations folded onto the eave fade out in the content (visibility switches only after 160 ms, so they are neither clickable nor focusable while fading); lamps on the eave
+ * scale to 1.25 on hover; the 2px bottom scrollbar is invisible when idle, appears when the pointer is over the timeline or while scrolling / dragging, and the track thickens to 4px on hover.
+ */
+.wf-scroller {
+  scrollbar-width: none;
+}
+.wf-scroller::-webkit-scrollbar {
+  display: none;
+}
+.wf-foldable {
+  transition:
+    opacity var(--wf-t-base) var(--wf-ease),
+    visibility 0s linear 0s;
+}
+.wf-folded {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--wf-t-base) var(--wf-ease),
+    visibility 0s linear var(--wf-t-base);
+}
+.wf-ledge-lamp {
+  transition: transform var(--wf-t-base) var(--wf-ease);
+}
+.wf-ledge-lamp:hover,
+.wf-ledge-lamp:focus-visible {
+  transform: scale(1.25);
+}
+.wf-sb {
+  opacity: 0;
+  transition:
+    opacity var(--wf-t-base) var(--wf-ease),
+    height var(--wf-t-fast) var(--wf-ease);
+}
+.wf-timeline:hover .wf-sb,
+.wf-sb[data-scrolling="true"],
+.wf-sb[data-dragging="true"] {
+  opacity: 1;
+}
+.wf-sb:hover,
+.wf-sb[data-dragging="true"] {
+  height: 4px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wf-lamp-running {
+    animation: wf-beat var(--wf-beat, 1.6s) var(--wf-ease, ease-in-out) infinite;
+  }
+}
+/* Workspace transcript:
+ * entries arrive one after another (wf-arrive + 24 ms stagger each, capped at 360 ms); the section header rule grows from the left; the tail of command output
+ * and the expanded panel drop in from above; once the landing entry is in place its background flashes once and falls back (once, not a persistent focus band);
+ * the running verb sweeps; when a status word changes value the old word leaves and the new one enters (wf-swap). Everything moves opacity / transform /
+ * background-color only; under reduced-motion arrival, landing, and sweep all go to zero.
+ */
+.wf-ws-entry {
+  transition: background-color var(--wf-t-base) var(--wf-ease);
+}
+.wf-ws-landed {
+  animation: wf-ws-land 1.4s var(--wf-ease) 1;
+}
+/* Landing spot on the detail page: the section header holds the background for 400 ms once in place, then falls back over 800 ms, once. */
+.wf-landed {
+  animation: wf-land 1.2s var(--wf-ease) 1;
+}
+@keyframes wf-land {
+  0%,
+  33% {
+    background-color: var(--color-surface-hover);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-landed {
+    animation: none;
+  }
+}
+.wf-ws-body {
+  animation: wf-unfold var(--wf-t-enter) var(--wf-ease);
+}
+.wf-ws-peek {
+  animation: wf-unfold var(--wf-t-enter) var(--wf-ease);
+  -webkit-mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), #000 40%),
+    linear-gradient(90deg, #000 82%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), #000 40%),
+    linear-gradient(90deg, #000 82%, transparent);
+  mask-composite: intersect;
+}
+.wf-ws-rule {
+  transform-origin: left center;
+  animation: wf-rail-grow var(--wf-t-ink) var(--wf-ease);
+}
+.wf-ws-shine {
+  color: transparent;
+  background: linear-gradient(
+    90deg,
+    var(--color-foreground-subtle) 0%,
+    var(--color-foreground) 40%,
+    var(--color-foreground-subtle) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: wf-ws-shine 2.4s linear infinite;
+}
+@keyframes wf-ws-land {
+  0% {
+    background-color: transparent;
+  }
+  20% {
+    background-color: var(--color-surface-hover);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes wf-ws-shine {
+  to {
+    background-position: 200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-ws-landed,
+  .wf-ws-body,
+  .wf-ws-peek,
+  .wf-ws-rule {
+    animation: none;
+  }
+  .wf-ws-shine {
+    animation: none;
+    color: var(--color-foreground-subtle);
+    background: none;
+  }
+}
+/* Tile face: identity color does not change with expression, motion applies to the eyes only, and the body always stays still. */
+.wf-face {
+  min-width: 20px;
+  min-height: 20px;
+  flex-shrink: 0;
+  --wf-face-body: #54b9a6;
+  --wf-face-eye: #ffffff;
+  --wf-face-x: 0px;
+  --wf-face-y: 0px;
+}
+.wf-face-eyes {
+  transform: translate(var(--wf-face-x), var(--wf-face-y));
+  transition: transform 360ms ease-in-out;
+}
+.wf-face-lids {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.wf-face [data-eye-expression] {
+  display: none;
+}
+.wf-face[data-expression="dots"] [data-eye-expression="dots"],
+.wf-face[data-expression="pill"] [data-eye-expression="pill"] {
+  display: inline;
+}
+.wf-face[data-expression="happy"] [data-eye-expression="happy"] {
+  display: inline;
+}
+.wf-face[data-expression="sleepy"] [data-eye-expression="sleepy"] {
+  display: inline;
+}
+.wf-face[data-expression="focused"] [data-eye-expression="focused"] {
+  display: inline;
+}
+.wf-face[data-expression="sad"] [data-eye-expression="sad"] {
+  display: inline;
+}
+.wf-face[data-expression="confused"] [data-eye-expression="confused"] {
+  display: inline;
+}
+
+.wf-face[data-motion="blink"] .wf-face-lids {
+  animation: wf-face-blink var(--wf-face-blink-time, 230ms) ease-in-out var(--wf-face-blinks, 2);
+}
+.wf-face[data-motion="morph"] .wf-face-lids {
+  animation: wf-face-morph 180ms ease-in-out;
+}
+.wf-face[data-motion="hop"] .wf-face-bounce {
+  animation: wf-face-hop 240ms ease-in-out var(--wf-face-hops, 2);
+}
+.wf-face-closed {
+  opacity: 0;
+}
+.wf-face[data-motion="blink"] .wf-face-closed {
+  animation: wf-face-closed-blink var(--wf-face-blink-time, 230ms) ease-in-out
+    var(--wf-face-blinks, 2);
+}
+.wf-face[data-motion="morph"] .wf-face-closed {
+  animation: wf-face-closed-morph 180ms ease-in-out;
+}
+@keyframes wf-face-blink {
+  0%,
+  70%,
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  35% {
+    transform: scaleY(0.333333);
+    opacity: 0;
+  }
+}
+@keyframes wf-face-closed-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+@keyframes wf-face-morph {
+  0%,
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  40%,
+  50% {
+    transform: scaleY(0.333333);
+    opacity: 0;
+  }
+}
+@keyframes wf-face-closed-morph {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  40%,
+  50% {
+    opacity: 1;
+  }
+}
+.wf-face[data-motion="float"] .wf-face-bounce {
+  animation: wf-face-float 600ms ease-in-out var(--wf-face-floats, 1);
+}
+.wf-face[data-motion="shake"] .wf-face-bounce {
+  animation: wf-face-shake 90ms linear var(--wf-face-shakes, 3);
+}
+@keyframes wf-face-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-0.5px);
+  }
+  70% {
+    transform: translateY(0.5px);
+  }
+}
+@keyframes wf-face-shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-0.9px, -0.35px);
+  }
+  75% {
+    transform: translate(0.9px, 0.35px);
+  }
+}
+.wf-face[data-motion="dots-wave"] [data-eye-expression="dots"] circle {
+  animation: wf-face-dot-float 500ms ease-in-out both;
+}
+.wf-face[data-motion="dots-wave"] [data-eye-expression="dots"] circle:nth-child(2) {
+  animation-delay: 200ms;
+}
+.wf-face[data-motion="dots-wave"] [data-eye-expression="dots"] circle:nth-child(3) {
+  animation-delay: 400ms;
+}
+@keyframes wf-face-dot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+@keyframes wf-face-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-1px);
+  }
+  70% {
+    transform: translateY(0.7px);
+  }
+}
+@keyframes wf-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes wf-mark {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes wf-unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+@keyframes wf-swap {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+@keyframes wf-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes wf-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes wf-rail-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes wf-land {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes wf-beat {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--color-warning) 20%, transparent),
+      0 0 0 3px color-mix(in oklab, var(--color-warning) 35%, transparent);
+  }
+  12% {
+    transform: scale(1.12);
+  }
+  40% {
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--color-warning) 20%, transparent),
+      0 0 0 8px color-mix(in oklab, var(--color-warning) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-arrive,
+  .wf-mark,
+  .wf-unfold,
+  .wf-swap,
+  .wf-draw,
+  .wf-caret,
+  .wf-rail-grow,
+  .wf-land {
+    animation: none;
+  }
+  .wf-draw {
+    stroke-dashoffset: 0;
+  }
+  .wf-pill,
+  .wf-pill-avatar,
+  .wf-pill-tile,
+  .wf-pill-name,
+  .wf-pill-go,
+  .wf-mark,
+  .wf-station,
+  .wf-lamp,
+  .wf-ink,
+  .wf-tile-frame,
+  .wf-line,
+  .wf-line-icon,
+  .wf-meter-seg,
+  .wf-digest-plot,
+  .wf-foldable,
+  .wf-folded,
+  .wf-ledge-lamp,
+  .wf-sb {
+    transition: none;
+  }
+  .wf-preview-doc {
+    animation: none;
+  }
+  /* Tile face: motion goes to zero and does not follow the pointer; the expression itself still shows the state — it is information, not decoration. */
+  .wf-face [data-eye-expression="dots"] circle,
+  .wf-face-body,
+  .wf-face-lids,
+  .wf-face-closed,
+  .wf-face-eyes,
+  .wf-face-bounce {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Mention icons do not enter the TextNode DOM, avoiding a leading img/svg truncating Lexical's native selection mapping. */
+.prompt-mention::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  background: var(--mention-icon-color, transparent) var(--mention-image, none) center / contain
+    no-repeat;
+  mask: var(--mention-mask, none) center / contain no-repeat;
+}
+
+.prompt-mention[data-mention-category="plugins"]::before {
+  border-radius: var(--radius-sm);
+}
+
+/*
+ * Compact density: reduces panel spacing, message margins, and session
+ * padding when `.compact` is toggled on `document.body` by the
+ * density preference. The class targets body to sit below theme
+ * specificity and above component defaults.
+ */
+.compact {
+  --panel-space: 12px;
+  --message-gap: 0.5rem;
+  --session-padding-y: 0.75rem;
+  --feed-padding: 0.75rem;
+}

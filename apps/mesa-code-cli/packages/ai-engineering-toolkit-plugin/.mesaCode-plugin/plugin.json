@@ -1,0 +1,8 @@
+{
+  "name": "ai-engineering-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based guidance for reviewing prompts, designing tool schemas, building evaluation harnesses, and shaping agent loops using existing tools and models; no bundled runtime or MCP services.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

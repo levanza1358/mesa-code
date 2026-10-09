@@ -1,0 +1,8 @@
+{
+  "name": "project-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based task breakdowns, release checklists, incident summaries, and authorized automation designs using existing tools; no bundled runtime or MCP services.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

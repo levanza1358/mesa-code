@@ -1,0 +1,21 @@
+
+=== LOCALE : 2 files, 5789 lines ===
+  5552  packages/ui/src/i18n/locales/zh-CN.ts
+   237  apps/mesa-code-cli/packages/i18n/src/locales/zh-CN.ts
+
+=== SOURCE : 2942 files, 49894 lines ===
+
+=== SOURCE LANGUAGES (TODO) ===
+ext        files    lines
+.ts         2347    40725
+.tsx         482     7693
+.mjs          72      777
+.md           10      302
+.js            2      154
+.css           3      118
+.cjs           3       37
+.json         13       37
+.yaml          2       21
+.html          4       16
+.sh            3       12
+.yml           1        2

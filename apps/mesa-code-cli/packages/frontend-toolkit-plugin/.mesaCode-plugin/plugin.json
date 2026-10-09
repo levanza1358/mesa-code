@@ -1,0 +1,8 @@
+{
+  "name": "frontend-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based guidance for accessible UI, responsive layouts, theme audits, and UI interaction tests with existing project and browser tools; includes no new runtime.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

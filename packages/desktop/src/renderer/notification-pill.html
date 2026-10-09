@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Mesa Code</title>
+    <style>
+      :root {
+        --ui-font-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 8px;
+        background: transparent;
+        font-family: system-ui, sans-serif;
+        font-size: var(--ui-font-size);
+      }
+      section {
+        background: var(--color-popover);
+        color: var(--color-foreground);
+        border: 1px solid var(--color-border);
+        border-radius: 24px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px #0003;
+      }
+      .text-ui-base {
+        font-size: var(--ui-font-size);
+      }
+      .text-ui-caption {
+        font-size: calc(var(--ui-font-size) * 0.93);
+      }
+      h1,
+      p {
+        margin: 0 0 6px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      h1 {
+        font-weight: 600;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 2px;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      #error:empty {
+        display: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none;
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section aria-live="polite" aria-label="Mesa Code">
+      <h1 id="title" class="text-ui-base"></h1>
+      <p id="body" class="text-ui-caption"></p>
+      <p id="preview" class="text-ui-caption"></p>
+      <p id="error" class="text-ui-caption" role="alert"></p>
+      <nav id="actions" aria-label="Notification actions"></nav>
+    </section>
+    <script type="module" src="/src/notification-pill.ts"></script>
+  </body>
+</html>

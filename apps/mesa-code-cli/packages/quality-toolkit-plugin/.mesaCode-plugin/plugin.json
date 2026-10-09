@@ -1,0 +1,8 @@
+{
+  "name": "quality-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based guidance for regression tests, code review, authorized defensive security review, and measured performance profiling using existing tools; includes no new runtime.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

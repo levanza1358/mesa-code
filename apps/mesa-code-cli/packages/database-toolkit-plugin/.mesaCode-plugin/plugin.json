@@ -1,0 +1,8 @@
+{
+  "name": "database-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based schema migrations, query optimization, data modeling, and seed fixtures using the project's existing database tooling; includes no bundled runtime, MCP service, or dependency.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

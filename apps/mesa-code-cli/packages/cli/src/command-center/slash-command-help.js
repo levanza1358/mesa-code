@@ -1,0 +1,1 @@
+export { BUILTIN_MESA_CODE_SLASH_COMMAND_HELP_ENTRIES as SLASH_COMMAND_HELP_ENTRIES, } from "@mesa-code/shared";

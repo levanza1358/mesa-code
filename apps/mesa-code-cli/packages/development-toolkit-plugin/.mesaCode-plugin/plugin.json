@@ -1,0 +1,8 @@
+{
+  "name": "development-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based guidance for mapping codebases, diagnosing root causes, refactoring safely, and designing APIs with existing project tools; includes no new runtime.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

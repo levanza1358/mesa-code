@@ -1,0 +1,8 @@
+{
+  "name": "docs-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based README authoring, API reference pages, changelog and release notes, and documentation-site structure using existing project tooling; includes no bundled runtime, MCP service, or dependency.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}

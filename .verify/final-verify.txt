@@ -1,0 +1,62 @@
+=== typecheck ===
+
+> mesa-code@1.0.0 typecheck C:\Users\Kuroneko\Documents\project\mesacode-quiet-studio
+> tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services packages/client packages/server packages/mesa-code-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json
+
+TYPECHECK_EXIT=0
+=== lint ===
+
+> mesa-code@1.0.0 lint C:\Users\Kuroneko\Documents\project\mesacode-quiet-studio
+> oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 338ms on 2575 files using 8 threads.
+LINT_EXIT=0
+=== arch ===
+
+> mesa-code@1.0.0 architecture:check C:\Users\Kuroneko\Documents\project\mesacode-quiet-studio
+> node scripts/architecture/architecture-check.mjs check
+
+architecture: OK
+violations: 0
+baseline: 0
+new: 0
+ARCH_EXIT=0
+=== quiet-studio-check ===
+Quiet Studio surface, conversation, ownership, navigation, mobile and isolation source checks passed.
+EXIT=0
+=== quiet-studio-name-check ===
+Mesa Code app/installer display names and existing profile identities passed.
+EXIT=0
+=== desktop unit tests ===
+✔ sender authentication, stale clicks, original option IDs and no app restore on answer (12.0977ms)
+✔ subframe and missing-frame senders cannot publish, clear or answer (0.7035ms)
+✔ permission survives status; resolved elsewhere, disabled/unmounted clear exact token (1.1298ms)
+✔ focus hides; status expires; open restores exact source; dispose removes listeners (1.2898ms)
+✔ load failure and source destruction fail hidden (1.0587ms)
+✔ non-Windows and strict validation fail hidden; positioning clamps negative display (1.3147ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1141.4885
+EXIT=0
+=== ui unit tests ===
+✔ preview is answer text, whitespace normalized and bounded to 120 (1.46ms)
+✔ safe options retain original IDs; rich detail, free text and ambiguous options require Open (1.0814ms)
+✔ exact live identity, remote attachment, epoch, revision, request and option required (0.3671ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 334.4263
+EXIT=0
+=== synthetic journey ===
+Notification pill synthetic Electron interaction and V4 ACK checks passed. Evidence: C:\Users\Kuroneko\Documents\project\mesacode-quiet-studio\.quiet-studio-runtime\notification-pill-e2e\run-mbOSwg
+EXIT=0

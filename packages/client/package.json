@@ -1,0 +1,21 @@
+{
+  "name": "@mesa-code/client",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./globals": "./src/globals.d.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
+  },
+  "dependencies": {
+    "@mesa-code/rpc": "workspace:*",
+    "@mesa-code/services": "workspace:*",
+    "@mesa-code/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

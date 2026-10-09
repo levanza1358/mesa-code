@@ -1,0 +1,8 @@
+{
+  "name": "data-toolkit",
+  "version": "1.0.0",
+  "description": "Instruction-based CSV analysis, spreadsheet reporting, SQL review, and data-quality checks using available tools; no bundled runtime or MCP services.",
+  "author": { "name": "Mesa Code" },
+  "license": "MIT",
+  "skills": "skills"
+}
