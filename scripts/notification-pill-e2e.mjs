@@ -4,6 +4,10 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkNotificationPillRegressions } from "./notification-pill-regressions.mjs";
+import {
+  buildNotificationPillAnswersBundle,
+  checkNotificationPillAnswerPanel,
+} from "./notification-pill-answer-panel-e2e.mjs";
 
 // Synthetic isolated Electron journey: no Host, Agent, settings, network or real permissions.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,7 +36,9 @@ app.whenReady().then(async () => {
     sourceWindow: event => BrowserWindow.fromWebContents(event.sender),
     isAppFocused: () => !source.isDestroyed() && source.isFocused(), warn: console.warn,
     createWindow: () => new BrowserWindow({ width: 520, height: 180, frame: false, transparent: true, show: false, alwaysOnTop: true, skipTaskbar: true, webPreferences: { preload: ${JSON.stringify(join(run, "notification-pill.cjs"))}, contextIsolation: true, nodeIntegration: false, sandbox: true } }),
-    loadWindow: win => win.loadFile(${JSON.stringify(join(run, "notification-pill.html"))}) });
+    loadWindow: win => win.loadFile(${JSON.stringify(join(run, "notification-pill.html"))}),
+    createPanelWindow: () => new BrowserWindow({ width: 520, height: 360, frame: false, transparent: true, show: false, alwaysOnTop: true, skipTaskbar: true, webPreferences: { preload: ${JSON.stringify(join(run, "notification-pill.cjs"))}, contextIsolation: true, nodeIntegration: false, sandbox: true } }),
+    loadPanelWindow: win => win.loadFile(${JSON.stringify(join(run, "notification-pill-answers.html"))}) });
   app.on('browser-window-focus', (_event, win) => { if (win === source) owner.onAppFocus(); });
   await source.loadURL('data:text/html,<title>Synthetic source</title><h1>Synthetic source</h1>');
 });
@@ -69,6 +75,7 @@ await writeFile(
   join(run, "notification-pill.html"),
   html.replace("/src/notification-pill.ts", "./renderer.js"),
 );
+await buildNotificationPillAnswersBundle({ root, run, build, readFile, writeFile, join });
 await writeFile(
   join(run, "source.cjs"),
   `const {contextBridge,ipcRenderer}=require('electron'); let replies=[]; ipcRenderer.on('mesaCode:notification-pill-reply',(_,value)=>replies.push(value)); ipcRenderer.on('mesaCode:task-notification-click',(_,value)=>replies.push({open:value})); contextBridge.exposeInMainWorld('testPill',{publish:value=>ipcRenderer.send('mesaCode:notification-pill-publish',value),replies:()=>replies,onAction:handler=>{const listener=(_,value)=>handler(value);ipcRenderer.on('mesaCode:notification-pill-reply',listener);return()=>ipcRenderer.removeListener('mesaCode:notification-pill-reply',listener);}});`,
@@ -259,6 +266,7 @@ try {
     window.testPill.replies().some((value) => value.open === "synthetic-session"),
   );
   assert.equal(await isSourceMinimized(), false);
+  await checkNotificationPillAnswerPanel({ source, pill, app, publish, value });
   await source.goto(`file:///${join(run, "owner.html").replaceAll("\\", "/")}`);
   await source.waitForFunction(() => Boolean(window.ownerHarness));
   await app.evaluate(({ BrowserWindow }) =>

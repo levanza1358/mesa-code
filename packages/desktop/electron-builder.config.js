@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- Electron Builder config keeps related packaging hooks together so build order stays explicit. */
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { readdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { runCommand, runCommandAndReadStdout } from "../../scripts/spawn-command.mjs";
@@ -14,7 +13,10 @@ import {
   resolvePackagedNodePtyPrebuildPath,
   restoreTargetNodePtyPrebuild,
 } from "./scripts/node-pty-package-assets.mjs";
-import { cleanupPackagedSourcemaps } from "./scripts/packaged-sourcemap-cleanup.mjs";
+import {
+  stripSourcemapsInResources,
+  stripSourcemapsInStaging,
+} from "./scripts/packaged-sourcemap-cleanup.mjs";
 import { getTargetPlatform } from "./scripts/target-platform.mjs";
 import {
   resolveDesktopArtifactSuffix,
@@ -62,7 +64,7 @@ import {
   createDesktopNativePackagePrunePatterns,
   parseAsarListWithPackState,
 } from "./scripts/desktop-native-package-policy.mjs";
-import { replaceAppAsarFromStaging } from "./scripts/app-asar-repack.mjs";
+import { rewriteAppAsarOnce } from "./scripts/app-asar-rewrite.mjs";
 import {
   patchNsisInstallSectionFile,
   restoreNsisInstallSectionFileSync,
@@ -339,7 +341,58 @@ function resolveMissingRuntimeModules(appAsarPath) {
   });
 }
 
-async function injectHoistedRuntimeModulesIntoAsar(context) {
+/**
+ * Copy the hoisted runtime modules electron-builder missed into a staged asar
+ * directory. Returns whether anything was written.
+ *
+ * Merged into the single `afterPack` asar rewrite so the archive is extracted
+ * once instead of once per fix.
+ */
+function injectRuntimeModulesIntoStaging({ stagingDir, missingRuntimeModules }) {
+  if (missingRuntimeModules.length === 0) {
+    console.log("[afterPack] runtime modules already complete, skip injection");
+    return { changed: false };
+  }
+
+  console.log(`[afterPack] missing runtime modules count=${missingRuntimeModules.length}`);
+
+  const stagingNodeModulesDir = resolve(stagingDir, "node_modules");
+  mkdirSync(stagingNodeModulesDir, { recursive: true });
+
+  for (const runtimeModule of missingRuntimeModules) {
+    const { moduleName, sourceModulePath } = runtimeModule;
+    const targetModulePath = resolve(stagingNodeModulesDir, moduleName);
+
+    if (!sourceModulePath) {
+      throw new Error(
+        `未找到运行时依赖 ${moduleName}，已搜索: ${runtimeModuleLookupRoots
+          .map((lookupRoot) => resolve(lookupRoot, "node_modules", moduleName))
+          .join(", ")}`,
+      );
+    }
+
+    // pnpm hoisted 布局下，electron-builder 可能把主包打进 app.asar，
+    // 却漏掉它解析时还要去根 node_modules 找的运行时依赖。
+    // 之前 require-in-the-middle 漏过 module-details-from-path，这次 @fiahfy/icns 又漏了 pngjs，
+    // 最终都会在已安装应用里触发 Cannot find module 并让主进程启动直接崩溃。
+    // 这里按 package.json 递归补齐依赖闭包，避免每次只补一个缺失包、上线后再暴露下一个子依赖。
+    mkdirSync(dirname(targetModulePath), { recursive: true });
+    rmSync(targetModulePath, { force: true, recursive: true });
+    cpSync(sourceModulePath, targetModulePath, { recursive: true });
+  }
+
+  return { changed: true };
+}
+
+/**
+ * Rewrite app.asar once, applying both afterPack fixes in a single
+ * extract/repack cycle.
+ *
+ * Previously runtime-module injection and sourcemap cleanup each ran their own
+ * extract+pack over the ~27k-file archive, which dominated packaging time. The
+ * merge keeps the same mutations and ordering but touches the archive once.
+ */
+async function rewriteAppAsarWithAfterPackFixes(context) {
   const appAsarPath = resolveAppAsarPath(context);
   if (!existsSync(appAsarPath)) {
     throw new Error(`打包产物缺少 app.asar: ${appAsarPath}`);
@@ -348,83 +401,29 @@ async function injectHoistedRuntimeModulesIntoAsar(context) {
   const missingRuntimeModules = runTimedSync("afterPack:scan-missing-runtime-modules", () =>
     resolveMissingRuntimeModules(appAsarPath),
   );
-  if (missingRuntimeModules.length === 0) {
-    // 之前 afterPack 每次都完整 extract/pack app.asar，即使运行时依赖已经齐全也会重复重写。
-    // 这会把每次打包固定拉长十几秒到几十秒。先做缺失扫描，只有真的缺包才执行重写流程。
-    console.log("[afterPack] runtime modules already complete, skip app.asar rewrite");
-    return;
-  }
-  console.log(`[afterPack] missing runtime modules count=${missingRuntimeModules.length}`);
 
-  // CI 会把 TMPDIR 指到项目内 .tmp，GitLab get_sources/clean 可能在脚本启动前清掉该目录。
-  // afterPack 里重写 app.asar 同样依赖 mkdtempSync，必须自己兜底创建父目录，避免后续签名阶段只看到 .app 消失。
-  mkdirSync(tmpdir(), { recursive: true });
-  const stagingDir = mkdtempSync(resolve(tmpdir(), "mesa-code-app-asar-"));
-  try {
-    runTimedSync("afterPack:asar-extract", () =>
-      runAsarCommand(["extract", appAsarPath, stagingDir]),
-    );
-
-    const stagingNodeModulesDir = resolve(stagingDir, "node_modules");
-    mkdirSync(stagingNodeModulesDir, { recursive: true });
-
-    runTimedSync("afterPack:copy-runtime-modules", () => {
-      for (const runtimeModule of missingRuntimeModules) {
-        const { moduleName, sourceModulePath } = runtimeModule;
-        const targetModulePath = resolve(stagingNodeModulesDir, moduleName);
-
-        if (!sourceModulePath) {
-          throw new Error(
-            `未找到运行时依赖 ${moduleName}，已搜索: ${runtimeModuleLookupRoots
-              .map((lookupRoot) => resolve(lookupRoot, "node_modules", moduleName))
-              .join(", ")}`,
-          );
-        }
-
-        // pnpm hoisted 布局下，electron-builder 可能把主包打进 app.asar，
-        // 却漏掉它解析时还要去根 node_modules 找的运行时依赖。
-        // 之前 require-in-the-middle 漏过 module-details-from-path，这次 @fiahfy/icns 又漏了 pngjs，
-        // 最终都会在已安装应用里触发 Cannot find module 并让主进程启动直接崩溃。
-        // 这里按 package.json 递归补齐依赖闭包，避免每次只补一个缺失包、上线后再暴露下一个子依赖。
-        // 只靠 package.json 显式依赖、本包 node_modules 镜像、files include 都没让它稳定进 asar，
-        // 所以在 afterPack 阶段直接重写 app.asar，先把这些运行时包补进去，再交给后续签名和出包。
-        mkdirSync(dirname(targetModulePath), { recursive: true });
-        rmSync(targetModulePath, { force: true, recursive: true });
-        cpSync(sourceModulePath, targetModulePath, { recursive: true });
-      }
-    });
-
-    await runTimedAsync("afterPack:asar-pack", () =>
-      replaceAppAsarFromStaging({
-        sourceDir: stagingDir,
-        appAsarPath,
-        targetPlatformKey: targetPlatform.key,
-        runAsarCommand,
-      }),
-    );
-  } finally {
-    rmSync(stagingDir, { force: true, recursive: true });
-  }
-}
-
-async function stripPackagedSourcemapReferences(context) {
-  // electron-builder 的 files 规则能排除 .map 文件，但无法删除 JS/CSS 末尾
-  // 指向 sourcemap 的注释；afterPack 注入运行时依赖后也可能重新带入第三方 sourceMappingURL。
-  // 这里统一清理 app.asar 与 unpacked/extraResources，保证最终发布包不暴露 sourcemap 路径入口。
-  await cleanupPackagedSourcemaps({
-    appAsarPath: resolveAppAsarPath(context),
-    resourcesDir: resolvePackagedResourcesDir(context),
+  await rewriteAppAsarOnce({
+    appAsarPath,
+    targetPlatformKey: targetPlatform.key,
     runAsarCommand,
     runTimedSync,
     runTimedAsync,
-    replaceAppAsarFromStaging: ({ sourceDir, appAsarPath }) =>
-      replaceAppAsarFromStaging({
-        sourceDir,
-        appAsarPath,
-        targetPlatformKey: targetPlatform.key,
-        runAsarCommand,
-      }),
+    mutators: [
+      (stagingDir) => injectRuntimeModulesIntoStaging({ stagingDir, missingRuntimeModules }),
+      (stagingDir) => stripSourcemapsInStaging(stagingDir),
+    ],
   });
+}
+
+/**
+ * Strip sourcemap references from the packaged resources directory (the files
+ * outside app.asar). The in-asar cleanup runs inside the merged rewrite.
+ */
+function stripPackagedResourceSourcemaps(context) {
+  // electron-builder 的 files 规则能排除 .map 文件，但无法删除 JS/CSS 末尾
+  // 指向 sourcemap 的注释；afterPack 注入运行时依赖后也可能重新带入第三方 sourceMappingURL。
+  // 这里统一清理 app.asar 与 unpacked/extraResources，保证最终发布包不暴露 sourcemap 路径入口。
+  stripSourcemapsInResources(resolvePackagedResourcesDir(context));
 }
 
 function assertPackagedNativeResourcePolicy(context) {
@@ -549,11 +548,11 @@ export default {
             configuredTargetPlatform: targetPlatform,
           })
         : null;
-    await runTimedAsync("afterPack:injectHoistedRuntimeModulesIntoAsar", () =>
-      injectHoistedRuntimeModulesIntoAsar(context),
+    await runTimedAsync("afterPack:rewriteAppAsar", () =>
+      rewriteAppAsarWithAfterPackFixes(context),
     );
-    await runTimedAsync("afterPack:stripPackagedSourcemapReferences", () =>
-      stripPackagedSourcemapReferences(context),
+    runTimedSync("afterPack:stripResourceSourcemaps", () =>
+      stripPackagedResourceSourcemaps(context),
     );
     runTimedSync("afterPack:assertPackagedNativeResourcePolicy", () =>
       assertPackagedNativeResourcePolicy(context),
@@ -628,6 +627,15 @@ export default {
       // 不再随包内置独立 Node 二进制。远端 SSH/WSL 仍走原生二进制（无 Electron）。
       from: `bundled-agents/${targetPlatform.key}/glm`,
       to: "glm",
+      filter: ["**/*", "!**/*.map"],
+    },
+    {
+      // Built web client, staged by prepare:web-bundle. The desktop Host serves
+      // it as the static root of the LAN/Tailscale listener, so a browser gets
+      // the real web UI and shares this window's session.
+      // See docs/specs/local-network-access.md.
+      from: `bundled-web/${targetPlatform.key}`,
+      to: "web",
       filter: ["**/*", "!**/*.map"],
     },
     {

@@ -3,6 +3,7 @@ import { resolveInitialModelSelection, type ModelSelectionOptions } from "@mesa-
 import { resolveBashTimeoutPolicy, type AgentProfile, type AgentRuntimeConfig } from "@mesa-code/core";
 import { type BuiltInSubagentModelSelectionOverrides } from "@mesa-code/shared";
 import {
+  DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS,
   type CollaborationMode,
   type HookConfigSource,
   type HookEventName,
@@ -166,6 +167,11 @@ export function resolveAppRuntimeConfig(input: {
     subagents: {
       ...options.runtimeConfig?.subagents,
       enabled: options.runtimeConfig?.subagents?.enabled ?? configResult.config.features.subagent,
+      // Bound child silence independently and below the model-stream idle timeout so the
+      // subagent watchdog fires first; a caller may still override this explicitly.
+      inactivityTimeoutMs:
+        options.runtimeConfig?.subagents?.inactivityTimeoutMs ??
+        DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS,
       outputRootDir: options.runtimeConfig?.subagents?.outputRootDir ?? subagentOutputRootDir,
       builtInModelSelectionOverrides: {
         ...(input.builtInSubagentModelSelectionOverrides ?? {}),

@@ -115,3 +115,36 @@ export async function cleanupPackagedSourcemaps({
     `[afterPack] resources sourcemap cleanup references=${stripSummary.referencesRemoved} files=${stripSummary.filesChanged} maps=${mapSummary.filesRemoved}`,
   );
 }
+
+/**
+ * Strip sourcemap references from an already-staged asar directory.
+ *
+ * Used by the merged `afterPack` rewrite so the archive is not extracted a
+ * second time just for this cleanup.
+ */
+export function stripSourcemapsInStaging(stagingDir, logger = console) {
+  const stripSummary = stripSourceMappingUrlCommentsInDirectory(stagingDir);
+  const mapSummary = removeSourceMapFilesInDirectory(stagingDir);
+
+  if (stripSummary.referencesRemoved > 0 || mapSummary.filesRemoved > 0) {
+    logger.log(
+      `[afterPack] stripped sourceMappingURL references=${stripSummary.referencesRemoved} files=${stripSummary.filesChanged} maps=${mapSummary.filesRemoved}`,
+    );
+  }
+
+  return {
+    changed: stripSummary.filesChanged > 0 || mapSummary.filesRemoved > 0,
+    ...stripSummary,
+    ...mapSummary,
+  };
+}
+
+/** Strip sourcemap references from the resources directory (outside the asar). */
+export function stripSourcemapsInResources(resourcesDir, logger = console) {
+  const stripSummary = stripSourceMappingUrlCommentsInDirectory(resourcesDir);
+  const mapSummary = removeSourceMapFilesInDirectory(resourcesDir);
+  logger.log(
+    `[afterPack] resources sourcemap cleanup references=${stripSummary.referencesRemoved} files=${stripSummary.filesChanged} maps=${mapSummary.filesRemoved}`,
+  );
+  return { changed: stripSummary.filesChanged > 0 || mapSummary.filesRemoved > 0 };
+}

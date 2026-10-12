@@ -39,6 +39,7 @@ import {
   ISettingService,
   IWindowControllerService,
   IConversationShareService,
+  INetworkAccessService,
   IMesaCodeAgentService,
   IMesaCodeTaskService,
   IMesaCodeSessionService,
@@ -146,6 +147,7 @@ import {
   type WindowRemoteConnectionHandle,
 } from "./windowRemoteConnectionRegistry.js";
 import { createWindowHostControllerRuntime } from "./windowHostControllerService.js";
+import { createNetworkAccessService, resolveWebStaticRoot } from "./networkAccessService.js";
 import { resolveAutomationSubmissionModelSelection } from "./automationModelSelection.js";
 import { createRemoteConnectionProgressContext } from "@mesa-code/server/remote/remoteConnectionProgressContext.js";
 import { startHostSelfResourceTelemetry } from "./hostSelfResourceTelemetry.js";
@@ -2470,7 +2472,9 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
   if (msg.type === HostMessageTypes.SessionMessageDeliveryResult) {
     const mesaCodeTaskService = activeServices?.getOptional(IMesaCodeTaskService);
     if (!mesaCodeTaskService) {
-      logger.warn("session message delivery result received before MesaCode task service initialized");
+      logger.warn(
+        "session message delivery result received before MesaCode task service initialized",
+      );
       return;
     }
     void mesaCodeTaskService.sendSessionMessageDeliveryResult(msg.result).catch((error) => {
@@ -2862,6 +2866,25 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
           );
           services.register(IMesaCodeTaskService, reportingMesaCodeTaskService);
         }
+        // Local network access (LAN/Tailscale): serve the web client from the
+        // window Host so a browser can open the same session. Desktop-host-only;
+        // the service owns the listener and the persisted host/port/enabled fields.
+        // See docs/specs/local-network-access.md.
+        const networkAccessService = createNetworkAccessService({
+          services,
+          settingService,
+          resolveStaticRoot: () => resolveWebStaticRoot(),
+          // Remote-workspace sessions bind the Host to a remote environment; the
+          // LAN listener must not cross that boundary, so it stays off there.
+          isRemoteWorkspace: () =>
+            windowRemoteConnectionRegistry.getStats().logicalSessionCount > 0,
+          log: (message) => logger.info(message),
+        });
+        services.register(INetworkAccessService, networkAccessService);
+        // Reconcile once at startup: if the preference is already on, bind now.
+        void networkAccessService.getState().catch((error) => {
+          logger.warn(`[network-access] initial reconcile failed: ${String(error)}`);
+        });
         wireLocalResourceTelemetry(services);
         hasDisposedHostResources = false;
         disposeHostResourcesInFlight = null;

@@ -225,16 +225,22 @@ function ToolLayoutComponent({
       return;
     }
 
-    navigator.clipboard.writeText(statusTooltip).then(() => {
-      setIsFailureTooltipCopied(true);
-      if (failureTooltipCopyResetRef.current !== null) {
-        window.clearTimeout(failureTooltipCopyResetRef.current);
-      }
-      failureTooltipCopyResetRef.current = window.setTimeout(() => {
-        setIsFailureTooltipCopied(false);
-        failureTooltipCopyResetRef.current = null;
-      }, 1500);
-    });
+    // `navigator.clipboard` is secure-context-only, so it is undefined on the plain
+    // http LAN web mirror. Optional-chain the write and swallow the rejection so a
+    // copy click never throws there (the "copied" state simply stays off).
+    void navigator.clipboard
+      ?.writeText(statusTooltip)
+      .then(() => {
+        setIsFailureTooltipCopied(true);
+        if (failureTooltipCopyResetRef.current !== null) {
+          window.clearTimeout(failureTooltipCopyResetRef.current);
+        }
+        failureTooltipCopyResetRef.current = window.setTimeout(() => {
+          setIsFailureTooltipCopied(false);
+          failureTooltipCopyResetRef.current = null;
+        }, 1500);
+      })
+      .catch(() => undefined);
   };
 
   const statusWordNode =

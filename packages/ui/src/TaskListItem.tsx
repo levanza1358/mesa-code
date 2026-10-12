@@ -11,7 +11,12 @@ import {
   Smartphone,
 } from "lucide-react";
 import { isCronTask, isOffPeakTask, type MesaCodeTaskMeta } from "@mesa-code/shared";
-import { TID_TASK_ARCHIVE, TID_TASK_ITEM, testId } from "@mesa-code/shared";
+import {
+  TID_TASK_ARCHIVE,
+  TID_TASK_ITEM,
+  TID_TASK_ROW_MORE_BUTTON,
+  testId,
+} from "@mesa-code/shared";
 import { Badge } from "@/components/ui/badge.js";
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
@@ -24,12 +29,11 @@ import {
 } from "@/lib/taskListItemPresentation.js";
 import { getTaskListAttention, getTaskListRowActivity } from "@/v4/taskListRowActivity.js";
 import { TaskListItemContextMenu } from "@/TaskListItemContextMenu.js";
+import { TaskRowMoreMenu } from "@/TaskRowMoreMenu.js";
+import { TaskActionMenuContent } from "@/TaskActionMenuContent.js";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu.js";
 import { TaskInteractionBadge } from "@/TaskInteractionBadge.js";
-import { useTaskListItemContextActions } from "@/useTaskListItemContextActions.js";
-import { useFeedbackStore } from "@/feedback/feedbackStore.js";
-import { useModelTrajectoryStore } from "@/store/modelTrajectoryStore.js";
-import { buildTaskFeedbackDescription } from "@/lib/taskFeedbackDraft.js";
-import { toast } from "@/components/ui/toast.js";
+import { useTaskActionMenuProps } from "@/useTaskActionMenuProps.js";
 import { buildTaskWorkspaceKey } from "@/lib/taskQueryCache.js";
 import { useV4SplitPaneEntry } from "@/v4/splitPaneEntryContext.js";
 import { buildWorkbenchSessionKey, useWorkbenchGroupStore } from "@/v4/workbenchGroupStore.js";
@@ -74,6 +78,13 @@ interface TaskListItemProps {
   intl: TaskListItemIntl;
   actionsDisabled?: boolean;
   actionsDisabledReason?: string;
+  /**
+   * Renders the touch-only "…" row menu. A touch screen has no right mouse
+   * button, so the right-click menu is unreachable there; when set, the row adds
+   * a "…" button opening the exact same action set. Never set on desktop, so the
+   * desktop row's DOM is unchanged.
+   */
+  showMoreMenu?: boolean;
 }
 
 function areJsonFieldsEqual(left: unknown, right: unknown) {
@@ -130,7 +141,8 @@ function areTaskListItemPropsEqual(left: TaskListItemProps, right: TaskListItemP
     left.onArchiveTask === right.onArchiveTask &&
     left.onMarkTaskAsUnread === right.onMarkTaskAsUnread &&
     left.onOpenTaskContextMenu === right.onOpenTaskContextMenu &&
-    left.onOpenFileTree === right.onOpenFileTree
+    left.onOpenFileTree === right.onOpenFileTree &&
+    left.showMoreMenu === right.showMoreMenu
   );
 }
 
@@ -146,6 +158,9 @@ export const MemoTaskItem = memo(function TaskListItem({
   onCancelArchiveConfirm,
   isArchiveConfirming,
   onTogglePinTask,
+  onStartRenameTask,
+  onArchiveTask,
+  onMarkTaskAsUnread,
   onOpenTaskContextMenu,
   onOpenFileTree,
   variant = "default",
@@ -153,6 +168,7 @@ export const MemoTaskItem = memo(function TaskListItem({
   intl,
   actionsDisabled = false,
   actionsDisabledReason,
+  showMoreMenu = false,
 }: TaskListItemProps) {
   const [hoverActionsVisible, setHoverActionsVisible] = useState(false);
   const [focusActionsVisible, setFocusActionsVisible] = useState(false);
@@ -481,11 +497,29 @@ export const MemoTaskItem = memo(function TaskListItem({
         </TaskRowActionButton>
       </span>
     ) : null;
+  // 触屏没有右键：行内加「…」按钮，复用与右键菜单同一套动作（TaskListItemMoreMenu
+  // 渲染共享的 TaskActionMenuContent）。桌面（showMoreMenu=false）行 DOM 不变。
+  const moreMenuNode = showMoreMenu ? (
+    <TaskListItemMoreMenu
+      workspacePath={workspacePath}
+      remoteSessionId={remoteSessionId}
+      task={task}
+      isPinned={isPinned}
+      intl={intl}
+      onTogglePinTask={onTogglePinTask}
+      onStartRenameTask={onStartRenameTask}
+      onArchiveTask={onArchiveTask}
+      onMarkTaskAsUnread={onMarkTaskAsUnread}
+      disableTaskActions={actionsDisabled}
+      disabledReason={actionsDisabledReason}
+    />
+  ) : null;
   const taskActionGroupNode =
-    fileTreeActionNode || archiveActionNode ? (
+    fileTreeActionNode || archiveActionNode || moreMenuNode ? (
       <span data-task-row-actions="true" className="flex shrink-0 items-center gap-0.5">
         {fileTreeActionNode}
         {archiveActionNode}
+        {moreMenuNode}
       </span>
     ) : null;
   const pinActionButton = (
@@ -810,152 +844,88 @@ export function TaskListItemContextMenuContent({
   disableTaskActions?: boolean;
   disabledReason?: string;
 }) {
-  const workspaceActionsDisabled = useOptionalTabStore(
-    (state) =>
-      disableTaskActions || isWorkspaceReadOnly(state, task.workspacePath, task.workspaceIdentity),
-  );
-  const workspaceActionsDisabledReason = workspaceActionsDisabled
-    ? (disabledReason ?? intl.formatMessage({ id: "workspaceSidebar.unavailableLocalDirectory" }))
-    : undefined;
-  // 收尾：「在分屏打开」仅桌面 shell（context 由 WorkspaceShellLayout 提供；
-  // 手机远控/无 Provider 环境默认 false → 菜单项整体不渲染）。
-  const splitPaneEntry = useV4SplitPaneEntry();
-  const splitPaneEntryEnabled = splitPaneEntry.enabled;
-  const splitPaneTarget = useMemo(
-    () => ({
-      workspacePath,
-      ...(task.workspaceIdentity?.trim() ? { workspaceIdentity: task.workspaceIdentity } : {}),
-      ...(remoteSessionId ? { remoteSessionId } : {}),
-      sessionId: task.taskId,
-    }),
-    [remoteSessionId, task.taskId, task.workspaceIdentity, workspacePath],
-  );
-  // 当前 focused session、已有 group 与 pane 上限统一由 shell owner 裁决；row 不再直接写 layout store。
-  const canOpenInSplitPane = splitPaneEntry.canOpenSession(splitPaneTarget);
-  const openFeedbackSubmit = useFeedbackStore((state) => state.openSubmit);
-  const {
-    taskSessionFile,
-    taskNativeSessionLogFile,
-    fileManagerLabel,
-    handleCopyText,
-    handleOpenTaskPathInFileManager,
-  } = useTaskListItemContextActions({
+  // 右键菜单是列表级单例：只有菜单真正打开时才渲染本组件，因此路径探测和
+  // provider 配置探测可以直接随打开态运行，避免每个 idle row 订阅和计算。
+  const menuProps = useTaskActionMenuProps({
     workspacePath,
     remoteSessionId,
-    workspaceIdentity: task.workspaceIdentity,
-    taskId: task.taskId,
-    provider: task.provider,
+    task,
+    isPinned,
     intl,
-    // row 级菜单已收敛为列表级单例，只有菜单真正打开时才挂载此组件。
-    // 因此路径探测和 provider 配置探测可以直接随打开态运行，避免每个 idle row 订阅和计算。
+    onTogglePinTask,
+    onStartRenameTask,
+    onArchiveTask,
+    onMarkTaskAsUnread,
+    disableTaskActions,
+    disabledReason,
     loadTaskPaths: true,
   });
-  const taskTitle =
-    task.title ||
-    intl.formatMessage({
-      id: task.forkedFromTaskId ? "taskList.forkedUntitled" : "taskList.untitled",
-    });
 
-  const handleOpenTaskFeedback = useCallback(async () => {
-    // 任务右键菜单之前只能复制日志/路径，反馈时缺少任务上下文。
-    // 这里复用反馈中心 draft，只预填脱敏后的任务线索，附件由用户主动选择。
-    openFeedbackSubmit({
-      title: intl
-        .formatMessage(
-          { id: "feedback.submit.template.section.taskFeedbackTitle" },
-          { title: taskTitle },
-        )
-        .slice(0, 80),
-      type: "bug",
-      module: "Agent任务执行失败",
-      severity: "P2-中",
-      includeLogs: false,
-      description: buildTaskFeedbackDescription({
-        taskTitle,
-        taskId: task.taskId,
-        workspacePath,
-        taskSessionPath: taskSessionFile.path,
-        taskLogPath: taskNativeSessionLogFile.path,
-        formatMessage: (id: string, values?: Record<string, string>) =>
-          intl.formatMessage({ id }, values),
-      }),
-      screenshots: [],
-    });
-    toast(intl.formatMessage({ id: "taskList.feedbackOpened" }));
-  }, [
-    intl,
-    openFeedbackSubmit,
-    task.taskId,
-    taskNativeSessionLogFile.path,
-    taskSessionFile.path,
-    taskTitle,
+  return <TaskListItemContextMenu {...menuProps} />;
+}
+
+/**
+ * Phone-layout "…" row menu. Renders the shared {@link TaskActionMenuContent}
+ * body (the same one the right-click menu renders) inside a `DropdownMenu`, so a
+ * touch user reaches every task action without a right mouse button. Path
+ * resolution is lazy: it runs only while the menu is open.
+ */
+function TaskListItemMoreMenuContent({
+  workspacePath,
+  remoteSessionId,
+  task,
+  isPinned,
+  intl,
+  onTogglePinTask,
+  onStartRenameTask,
+  onArchiveTask,
+  onMarkTaskAsUnread,
+  disableTaskActions = false,
+  disabledReason,
+}: {
+  workspacePath: string;
+  remoteSessionId?: string;
+  task: MesaCodeTaskMeta;
+  isPinned: boolean;
+  intl: TaskListItemIntl;
+  onTogglePinTask: (taskId: string, pinned: boolean) => void;
+  onStartRenameTask: (taskId: string, currentTitle: string) => void;
+  onArchiveTask: (taskId: string) => void;
+  onMarkTaskAsUnread: (taskId: string) => void;
+  disableTaskActions?: boolean;
+  disabledReason?: string;
+}) {
+  const menuProps = useTaskActionMenuProps({
     workspacePath,
-  ]);
-
+    remoteSessionId,
+    task,
+    isPinned,
+    intl,
+    onTogglePinTask,
+    onStartRenameTask,
+    onArchiveTask,
+    onMarkTaskAsUnread,
+    disableTaskActions,
+    disabledReason,
+    // Mounts only while the "…" menu is open, so it may resolve paths on open.
+    loadTaskPaths: true,
+  });
   return (
-    <TaskListItemContextMenu
-      intl={intl}
-      isPinned={isPinned}
-      fileManagerLabel={fileManagerLabel}
-      taskSessionFile={taskSessionFile}
-      activeSessionId={task.taskId}
-      taskNativeSessionLogFile={taskNativeSessionLogFile}
-      disableTaskActions={workspaceActionsDisabled}
-      disabledReason={workspaceActionsDisabledReason}
-      onTogglePinTask={() => {
-        onTogglePinTask(task.taskId, !isPinned);
-      }}
-      onStartRenameTask={() => {
-        onStartRenameTask(task.taskId, task.title);
-      }}
-      onArchiveTask={() => {
-        onArchiveTask(task.taskId);
-      }}
-      onMarkTaskAsUnread={() => {
-        onMarkTaskAsUnread(task.taskId);
-      }}
-      onOpenInSplitPane={
-        splitPaneEntryEnabled
-          ? () => {
-              // 旧入口直接写 paneLayout，绕过 active group 与 shell navigation，
-              // draft split 后下一次普通点击会把 session 灌进 primary。统一交给 shell controller。
-              splitPaneEntry.openSession(splitPaneTarget);
-            }
-          : undefined
-      }
-      openInSplitPaneDisabled={workspaceActionsDisabled || !canOpenInSplitPane}
-      onOpenTaskFeedback={() => {
-        void handleOpenTaskFeedback();
-      }}
-      onOpenTaskPathInFileManager={() => {
-        void handleOpenTaskPathInFileManager();
-      }}
-      onCopyWorkspacePath={() => {
-        void handleCopyText(intl.formatMessage({ id: "appHeader.copyPath" }), workspacePath);
-      }}
-      onCopyTaskPath={() => {
-        void handleCopyText(
-          intl.formatMessage({ id: "appHeader.copyTaskPath" }),
-          taskSessionFile.path,
-        );
-      }}
-      onCopyTaskLogPath={() => {
-        void handleCopyText(
-          intl.formatMessage({ id: "appHeader.copyLogPath" }),
-          taskNativeSessionLogFile.path,
-        );
-      }}
-      onCopySessionId={() => {
-        void handleCopyText(intl.formatMessage({ id: "appHeader.copySessionId" }), task.taskId);
-      }}
-      onViewModelTrajectory={() => {
-        // 通过单例 store 把“打开轨迹”请求交给所属 workspace 的侧边栏控制器（useAppPanels）。
-        useModelTrajectoryStore.getState().requestOpen({
-          taskId: task.taskId,
-          workspaceKey: task.workspaceIdentity?.trim() || workspacePath,
-          title: taskTitle,
-        });
-      }}
+    <TaskActionMenuContent
+      {...menuProps}
+      Item={DropdownMenuItem}
+      Separator={DropdownMenuSeparator}
     />
+  );
+}
+
+export function TaskListItemMoreMenu(props: Parameters<typeof TaskListItemMoreMenuContent>[0]) {
+  return (
+    <TaskRowMoreMenu
+      label={props.intl.formatMessage({ id: "common.more" })}
+      testId={testId(TID_TASK_ROW_MORE_BUTTON, props.task.taskId)}
+    >
+      <TaskListItemMoreMenuContent {...props} />
+    </TaskRowMoreMenu>
   );
 }

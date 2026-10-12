@@ -4,6 +4,7 @@ import type { KeyboardEvent, MouseEvent } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { UniqueIdentifier } from "@dnd-kit/core";
 import { isCronTask, isOffPeakTask, type MesaCodeTaskMeta } from "@mesa-code/shared";
+import { TID_TASK_ROW_MORE_BUTTON, testId } from "@mesa-code/shared";
 import { ArrowUpToLine, Clock, Cloud, Folder, ListTree, LoaderIcon, Moon, X } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
 import { Badge } from "@/components/ui/badge.js";
@@ -26,7 +27,11 @@ import { buildTaskFeedbackDescription } from "@/lib/taskFeedbackDraft.js";
 import { useTaskListItemContextActions } from "@/useTaskListItemContextActions.js";
 import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import { getTaskListAttention, getTaskListRowActivity } from "@/v4/taskListRowActivity.js";
-import { GroupedTaskContextMenuContent } from "@/workspace-grouped-tasks/task-context-menu-content.js";
+import {
+  GroupedTaskContextMenuContent,
+  GroupedTaskDropdownMenuItems,
+} from "@/workspace-grouped-tasks/task-context-menu-content.js";
+import { TaskRowMoreMenu } from "@/TaskRowMoreMenu.js";
 import { TaskRowActionButton } from "@/workspace-grouped-tasks/task-row-action-button.js";
 import { TaskInteractionBadge } from "@/TaskInteractionBadge.js";
 import { formatGroupedTaskHoverChangeParts } from "@/workspace-grouped-tasks/task-row-tooltip.js";
@@ -454,6 +459,33 @@ function GroupedTaskRowComponent({
                 <X className="size-3.5" />
               </TaskRowActionButton>
             </span>
+          ) : null}
+          {/* 触屏没有右键：给「…」菜单，动作与右键菜单完全一致（同一 GroupedTaskMenuBody）。
+              isHoverNone 限定触屏，canShowHoverActions 排除 drag overlay，桌面行 DOM 不变。 */}
+          {canShowHoverActions && isHoverNone ? (
+            <TaskRowMoreMenu
+              label={intl.formatMessage({ id: "common.more" })}
+              testId={testId(TID_TASK_ROW_MORE_BUTTON, task.taskId)}
+            >
+              <GroupedTaskDropdownMenuItems
+                task={task}
+                currentGroupId={currentGroupId}
+                groups={groups}
+                intl={intl}
+                fileManagerLabel={fileManagerLabel}
+                taskSessionFile={taskSessionFile}
+                taskNativeSessionLogFile={taskNativeSessionLogFile}
+                onMoveTaskToGroup={onMoveTaskToGroup}
+                onMoveTaskToTop={onMoveTaskToTop}
+                onStartRenameTask={onStartRenameTask}
+                onArchiveTask={onArchiveTask}
+                onMarkTaskAsUnread={onMarkTaskAsUnread}
+                onOpenTaskPathInFileManager={() => void handleOpenTaskPathInFileManager()}
+                onCopyText={(label, text) => void handleCopyText(label, text)}
+                onOpenTaskFeedback={() => void handleOpenTaskFeedback()}
+                disabledReason={workspaceActionsDisabledReason}
+              />
+            </TaskRowMoreMenu>
           ) : null}
         </span>
       </span>

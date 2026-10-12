@@ -1,0 +1,157 @@
+<!doctype html>
+<!--
+  Standalone visual check for the composer running glow.
+
+  Renders the same rule set quiet-studio.css applies, so the travelling highlight
+  can be eyeballed without launching the desktop app. Open this file directly in
+  a browser. This is a developer aid only; it is not part of the product build.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Composer running glow preview</title>
+    <style>
+      :root {
+        --color-background: #0d110f;
+        --color-panel: #151a17;
+        --color-foreground: #e6ece8;
+        --color-border: #2a332d;
+        --color-input-border: #46554a;
+        --color-brand: #4ade80;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        gap: 40px;
+        background: var(--color-background);
+        color: var(--color-foreground);
+        font: 14px/1.5 system-ui, sans-serif;
+      }
+
+      .frame {
+        width: 620px;
+      }
+
+      .label {
+        margin-bottom: 8px;
+        color: #8fa396;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      /* --- The rules under test, copied from quiet-studio.css --- */
+
+      .chat-composer-input-surface {
+        position: relative;
+        border: 1px solid var(--color-input-border);
+        border-radius: 14px;
+        background: var(--color-panel);
+        box-shadow: 0 4px 20px color-mix(in srgb, var(--color-foreground) 4%, transparent);
+        padding: 14px 16px;
+        min-height: 64px;
+      }
+
+      @keyframes quiet-studio-composer-glow-spin {
+        to {
+          --quiet-studio-composer-glow-angle: 360deg;
+        }
+      }
+
+      @keyframes quiet-studio-composer-glow-pulse {
+        0%,
+        100% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      @property --quiet-studio-composer-glow-angle {
+        syntax: "<angle>";
+        inherits: false;
+        initial-value: 0deg;
+      }
+
+      /* The ring is a top overlay so an opaque child (the editor wrapper or the
+         toolbar row) can never cover it. Children stay in the normal flow. */
+      [data-composer-running="true"] .chat-composer-input-surface::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: inherit;
+        padding: 1px;
+        pointer-events: none;
+        z-index: 1;
+        background: conic-gradient(
+          from var(--quiet-studio-composer-glow-angle),
+          transparent 0deg,
+          transparent 210deg,
+          color-mix(in srgb, var(--color-brand) 45%, transparent) 275deg,
+          var(--color-brand) 320deg,
+          color-mix(in srgb, var(--color-brand) 45%, transparent) 355deg,
+          transparent 360deg
+        );
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        mask-composite: exclude;
+        animation:
+          quiet-studio-composer-glow-spin 2.4s linear infinite,
+          quiet-studio-composer-glow-pulse 2.4s ease-in-out infinite;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [data-composer-running="true"] .chat-composer-input-surface::before {
+          animation: none;
+          background: none;
+          border: 1px solid var(--color-brand);
+          border-radius: inherit;
+          padding: 0;
+          -webkit-mask: none;
+          mask: none;
+        }
+      }
+
+      .placeholder {
+        color: #7b8a80;
+      }
+
+      /* Opaque child filling the surface, like the app's editor wrapper. */
+      .sim-editor-child {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--color-panel);
+        padding: 14px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame" data-composer-running="false">
+      <div class="label">Idle — neutral border (unchanged)</div>
+      <div class="chat-composer-input-surface">
+        <span class="placeholder">Keep typing to queue follow-up changes</span>
+      </div>
+    </div>
+
+    <div class="frame" data-composer-running="true">
+      <div class="label">Response running — travelling glow</div>
+      <div class="chat-composer-input-surface">
+        <!-- Mirrors the app's editor wrapper: an opaque child that fills the
+             surface. The ring must stay visible over it. -->
+        <div class="sim-editor-child">
+          <span class="placeholder">Keep typing to queue follow-up changes</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

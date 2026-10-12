@@ -519,17 +519,25 @@ export function ModelProviderSection({
     [activeOAuthProvider, refreshProviderPanelAfterAuthChange],
   );
 
+  // Read the refresh callback through a ref. Its identity depends on the
+  // service accessor, which upstream providers can recreate; keying the effect on
+  // the callback made it re-run whenever that happened, and each run reads three
+  // credentials. The effect below therefore keys only on the explicit refresh
+  // signal, which is what actually describes a required re-read.
+  const refreshCodingPlanPurchaseTokenStateRef = useRef(refreshCodingPlanPurchaseTokenState);
+  refreshCodingPlanPurchaseTokenStateRef.current = refreshCodingPlanPurchaseTokenState;
+
   useEffect(() => {
     let disposed = false;
 
-    void refreshCodingPlanPurchaseTokenState({
+    void refreshCodingPlanPurchaseTokenStateRef.current({
       shouldApply: () => !disposed,
     });
 
     return () => {
       disposed = true;
     };
-  }, [providerConnectionRefreshSignal, refreshCodingPlanPurchaseTokenState]);
+  }, [providerConnectionRefreshSignal]);
 
   useEffect(() => {
     if (!presetSubscriptionProviderId) {

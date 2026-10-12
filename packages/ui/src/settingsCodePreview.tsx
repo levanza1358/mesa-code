@@ -23,6 +23,10 @@ import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
 import type { CodePreviewSettings } from "@/store/index.js";
 import { THEME_MODES } from "@/settings/settingsPageConfig.js";
 import { MAX_UI_FONT_SIZE_PX, MIN_UI_FONT_SIZE_PX } from "@/lib/uiFontSize.js";
+import {
+  MAX_LIQUID_TRANSPARENCY,
+  MIN_LIQUID_TRANSPARENCY,
+} from "@/lib/liquidTransparency.js";
 import type { Density } from "@/store/appearanceState.js";
 
 function FontSizeInput({
@@ -91,6 +95,8 @@ export function AppearanceSectionContent({
   setDensity,
   uiFontSizePx,
   setUiFontSizePx,
+  liquidTransparency,
+  setLiquidTransparency,
 }: {
   codePreviewSettings: CodePreviewSettings;
   setCodePreviewSettings: (settings: Partial<CodePreviewSettings>) => void;
@@ -102,6 +108,8 @@ export function AppearanceSectionContent({
   setDensity: (density: Density) => void;
   uiFontSizePx: number;
   setUiFontSizePx: (fontSizePx: number) => void;
+  liquidTransparency: number;
+  setLiquidTransparency: (transparency: number) => void;
 }) {
   const { intl } = useMesaCodeIntl();
   const activePreviewMode = resolveTheme(theme);
@@ -214,6 +222,32 @@ export function AppearanceSectionContent({
                 />
               }
             />
+            {theme === "liquid" ? (
+              <SettingsRow
+                label={intl.formatMessage({ id: "settings.liquidTransparency" })}
+                description={intl.formatMessage({
+                  id: "settings.liquidTransparencyDescription",
+                })}
+                control={
+                  <div className="flex w-full min-w-0 items-center gap-3">
+                    <input
+                      type="range"
+                      min={MIN_LIQUID_TRANSPARENCY}
+                      max={MAX_LIQUID_TRANSPARENCY}
+                      step={1}
+                      value={liquidTransparency}
+                      aria-label={intl.formatMessage({ id: "settings.liquidTransparency" })}
+                      data-testid="appearance-liquid-transparency"
+                      onChange={(event) => setLiquidTransparency(Number(event.currentTarget.value))}
+                      className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-border accent-[var(--color-brand)]"
+                    />
+                    <span className="w-10 shrink-0 text-right text-ui-base tabular-nums text-foreground-subtle">
+                      {liquidTransparency}%
+                    </span>
+                  </div>
+                }
+              />
+            ) : null}
             <SettingsRow
               label={intl.formatMessage({ id: "settings.density" })}
               description={intl.formatMessage({

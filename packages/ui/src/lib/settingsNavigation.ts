@@ -4,12 +4,15 @@ import { logger } from "@/logger.js";
 export type SettingsSectionId =
   | "general"
   | "appearance"
+  | "notifications"
+  | "sound"
   | "modelProvider"
   | "memory"
   | "soul"
   | "extensions"
   | "usage"
   | "dataLocation"
+  | "network"
   | "subagents"
   | "hooks"
   | "automations"
@@ -67,12 +70,15 @@ function isSettingsSectionId(value: string): value is SettingsSectionId {
   return (
     value === "general" ||
     value === "appearance" ||
+    value === "notifications" ||
+    value === "sound" ||
     value === "modelProvider" ||
     value === "memory" ||
     value === "soul" ||
     value === "extensions" ||
     value === "usage" ||
     value === "dataLocation" ||
+    value === "network" ||
     value === "subagents" ||
     value === "hooks" ||
     value === "automations" ||

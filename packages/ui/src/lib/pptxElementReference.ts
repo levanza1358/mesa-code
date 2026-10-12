@@ -1,6 +1,8 @@
+import { sha256 } from "@mesa-code/shared";
 import type { PresentationPageElement } from "@/presentation/types.js";
 
-export const PPTX_ELEMENT_REFERENCE_ADD_TO_CHAT_EVENT = "mesaCode:pptx-element-reference-add-to-chat";
+export const PPTX_ELEMENT_REFERENCE_ADD_TO_CHAT_EVENT =
+  "mesaCode:pptx-element-reference-add-to-chat";
 const PPTX_ELEMENT_COMMENT_BLOCK_TITLE = "# Presentation element comments:";
 const PPTX_ELEMENT_COMMENT_BLOCK_DIRECTIVE =
   "Each item below is an independent comment on one presentation element. Treat every non-empty `comment` as the user's instruction for that element, process all of them, and never apply one item's comment to another reference.";
@@ -142,12 +144,16 @@ function createPptxElementReferenceId() {
 }
 
 export async function sha256Fingerprint(value: ArrayBuffer | string): Promise<string> {
-  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
-  const hex = [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  return `sha256:${hex}`;
+  // Route through the shared SHA-256 instead of touching `crypto.subtle` directly:
+  // `subtle` is secure-context-only, so the LAN web mirror on a phone over plain
+  // http would otherwise fail here. The helper prefers WebCrypto and falls back to
+  // the pure-JS digest off-localhost.
+  const digest = await sha256(value);
+  return `sha256:${toHex(digest)}`;
+}
+
+function toHex(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export async function createPptxElementReference(options: {

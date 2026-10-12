@@ -1,0 +1,138 @@
+<!doctype html>
+<!--
+  Standalone reproduction of the Settings sidebar, used to inspect the group-label
+  behaviour without launching the desktop app.
+
+  The group titles ("General", "Agent", "Data") render with `max-lg:sr-only` in
+  SettingsPage.tsx. Tailwind's `lg` breakpoint is 1024px, so below that width the
+  titles are visually hidden and only dividers remain. This page reproduces that
+  so the effect can be seen and fixed.
+
+  Developer aid only; not part of the product build.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Settings sidebar group labels</title>
+    <style>
+      :root {
+        --bg: #0d110f;
+        --sidebar: #1b211d;
+        --border: #2a332d;
+        --fg: #e6ece8;
+        --fg-subtlest: #7d8f84;
+        --hover: #232b26;
+        --accent: #24312a;
+        --brand: #4ade80;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+
+      .row {
+        display: flex;
+        gap: 24px;
+        padding: 20px;
+        align-items: flex-start;
+      }
+
+      .case {
+        flex: 1 1 0;
+      }
+
+      .case > h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--fg-subtlest);
+        margin: 0 0 8px;
+      }
+
+      /* Sidebar shell, mirroring SettingsPage's aside + nav. */
+      .sidebar {
+        background: var(--sidebar);
+        border-right: 1px solid var(--border);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px;
+        height: 420px;
+        overflow-y: auto;
+      }
+
+      .group + .group {
+        margin-top: 16px;
+      }
+
+      /* `px-2.5 pb-1 text-ui-sm font-medium text-foreground-subtlest`
+         The group title is part of the design (Settings groups are General,
+         Agent, Data), so it stays visible at every width. It previously carried
+         `max-lg:sr-only`, which clipped every title below 1024px and left only
+         dividers. */
+      .group-label {
+        padding: 0 10px 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--fg-subtlest);
+      }
+
+      .item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        color: var(--fg);
+      }
+
+      .item.selected {
+        background: var(--accent);
+        box-shadow: inset 2px 0 var(--brand);
+      }
+
+      .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        background: #38473e;
+        flex: none;
+      }
+
+      .width-note {
+        font-size: 11px;
+        color: var(--fg-subtlest);
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="case" style="max-width: 420px">
+        <h2>Narrow window (below 1024px) — fixed</h2>
+        <div class="sidebar">
+          <div class="group">
+            <div class="group-label">General</div>
+            <div class="item selected"><span class="dot"></span>System</div>
+            <div class="item"><span class="dot"></span>Appearance</div>
+            <div class="item"><span class="dot"></span>Shortcuts</div>
+          </div>
+          <div class="group">
+            <div class="group-label">Agent</div>
+            <div class="item"><span class="dot"></span>Model Providers</div>
+            <div class="item"><span class="dot"></span>Memory</div>
+            <div class="item"><span class="dot"></span>Soul</div>
+          </div>
+          <div class="group">
+            <div class="group-label">Data</div>
+            <div class="item"><span class="dot"></span>Usage</div>
+            <div class="item"><span class="dot"></span>Data Location</div>
+          </div>
+        </div>
+        <div class="width-note">Group titles and section labels stay visible at every width.</div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useProviderSettingsView } from "@/hooks/useProviderSettingsView.js";
 import { useServices } from "@/hooks/useServices.js";
 import { useCodingPlanEntitlements } from "@/settings/model-provider-section/useCodingPlanEntitlements.js";
@@ -32,6 +32,18 @@ export function useCodingPlanEntryPlanList(): CodingPlanEntryInventory {
     if (state.status === "error") reload();
     setGeneration((value) => value + 1);
   }, [state.status, reload]);
+  // `refresh` and the provider view are recreated on upstream renders, so using
+  // them directly in the effect below re-fired the probe continuously: each run
+  // issued two credential reads, which produced sustained ~200+/s
+  // `credential.load` RPC traffic and an endless reload loop. Keep them behind
+  // refs and trigger the effect only from the values that describe *what* to
+  // load: the provider view's revision and an explicit retry generation.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  // Content key for the provider view. The revision identifies the same registry
+  // fact, so the effect below keys on it instead of the view object's identity.
+  const providerSettingsViewRevision = providerSettingsView?.revision ?? null;
+
   const [teams, setTeams] = useState<{
     user: typeof user;
     view: typeof providerSettingsView;
@@ -43,7 +55,7 @@ export function useCodingPlanEntryPlanList(): CodingPlanEntryInventory {
     let cancelled = false;
     // 团队订阅以 authenticated pricing 为准，不用静态商品目录推断已购套餐。
     void Promise.all([
-      refresh({ force: true, silent: true }),
+      refreshRef.current({ force: true, silent: true }),
       Promise.all(
         (["bigmodel", "zai"] as const).map(async (family) => {
           let token: string | null = null;
@@ -86,10 +98,9 @@ export function useCodingPlanEntryPlanList(): CodingPlanEntryInventory {
     credentialService,
     codingPlanSubscriptionService,
     user,
-    providerSettingsView,
+    providerSettingsViewRevision,
     generation,
     loading,
-    refresh,
   ]);
   const sameIdentity = teams?.user === user && teams?.view === providerSettingsView;
   const current = sameIdentity && teams?.generation === generation;

@@ -25,3 +25,25 @@ export function getMediaPreviewFormat(path: string): MediaPreviewFormat | null {
   const normalizedPath = path.replace(/\\/g, "/").toLowerCase();
   return MEDIA_PREVIEW_FORMATS.find(({ extension }) => normalizedPath.endsWith(extension)) ?? null;
 }
+
+/** Still-image formats an assistant response can preview inline. */
+export interface ImagePreviewFormat {
+  extension: string;
+  mediaType: string;
+}
+
+export const IMAGE_PREVIEW_FORMATS: readonly ImagePreviewFormat[] = [
+  { extension: ".png", mediaType: "image/png" },
+  { extension: ".jpg", mediaType: "image/jpeg" },
+  { extension: ".jpeg", mediaType: "image/jpeg" },
+  { extension: ".gif", mediaType: "image/gif" },
+  { extension: ".webp", mediaType: "image/webp" },
+  { extension: ".avif", mediaType: "image/avif" },
+  { extension: ".bmp", mediaType: "image/bmp" },
+  { extension: ".svg", mediaType: "image/svg+xml" },
+];
+
+export function getImagePreviewFormat(path: string): ImagePreviewFormat | null {
+  const normalizedPath = path.replace(/\\/g, "/").toLowerCase();
+  return IMAGE_PREVIEW_FORMATS.find(({ extension }) => normalizedPath.endsWith(extension)) ?? null;
+}

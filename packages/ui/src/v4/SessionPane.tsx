@@ -99,6 +99,8 @@ import { projectSessionConfigToTaskConfigOptions } from "@/v4/composer/sessionCo
 import { useDraftRuntimeRebuildGate } from "@/v4/composer/useDraftRuntimeRebuildGate.js";
 import { useDraftModelReadinessGate } from "@/v4/composer/useDraftModelReadinessGate.js";
 import { useSettings } from "@/hooks/useSettingService.js";
+import { useSubagentTaskNotifications } from "@/hooks/useSubagentTaskNotifications.js";
+import { DEFAULT_TASK_NOTIFICATION_PREFERENCES } from "@/lib/taskNotificationPreferences.js";
 import { useMesaCodeStoreWithDefault } from "@/store/StoreProvider.js";
 import { useMesaCodeSessionStore } from "@/store/mesa-code-session-store.js";
 import {
@@ -602,7 +604,16 @@ export function SessionPane({
     );
   }, [conversationTelemetry, conversationTelemetryForegroundEnabled, sessionId, telemetryVisible]);
   const [lease, setLease] = useState<SessionLease | null>(null);
-  const state = useConversationProjection(lease);
+  // Guard against the stale-lease frame on a chat switch: the lease is acquired in a passive effect,
+  // so on the commit where `sessionId` already points at the new session the lease still belongs to
+  // the previous one. Without the guard the projection hands out the OLD session's snapshot and the
+  // pane renders it under the new task (old chat / scroll jump / docks + composer flash): see
+  // useConversationProjection. `lease?.sessionId ?? sessionId` always matches a set lease; it only
+  // gates the null-lease transition frame, where comparing against the current `sessionId` (null for
+  // a draft, so the draft's prewarm projection still renders) is exactly right.
+  const state = useConversationProjection(lease, {
+    sessionId: lease?.sessionId ?? sessionId,
+  });
   const snapshot = state.snapshot;
   // Response text changes do not affect composer routing, controls, or draft state.
   const composerSnapshot = useIdentityStableValue(
@@ -987,7 +998,7 @@ export function SessionPane({
     workspaceIdentity,
     workspacePath,
   ]);
-  const sessionLeaseReady = lease?.sessionId === sessionId;
+  const sessionLeaseReady = lease === null ? sessionId === null : lease.sessionId === sessionId;
   const shouldMeasureExistingSessionOpen =
     sessionLeaseReady && newlyCreatedSessionIdRef.current !== sessionId;
   useSessionOpenArmsTelemetry({
@@ -3705,7 +3716,13 @@ export function SessionPane({
 
   // subscribe ACK 会先把 store 置 live，initial snapshot 稍后才到；只看
   // status 会在无投影窗口提前启用编辑器。正式 session 必须等首个 snapshot 才可输入。
-  const connecting = sessionId !== null && (state.status === "connecting" || snapshot === null);
+  // `sessionLeaseReady` additionally keeps the composer disabled for the whole chat switch: on the
+  // commit where `sessionId` has moved to the new session but the old session's lease is still held,
+  // the composer must not briefly re-enable (the "editor flashes" part of the switch glitch) before
+  // the new session's first snapshot arrives.
+  const connecting =
+    sessionId !== null &&
+    (!sessionLeaseReady || state.status === "connecting" || snapshot === null);
   const queueEditActiveForCurrentComposer =
     queueEditOperation?.sessionId === sessionId && queueEditOperation.workspaceKey === workspaceKey;
   const errored = sessionId !== null && state.status === "error";
@@ -3839,6 +3856,27 @@ export function SessionPane({
   // CLI V4 projection 是 running/count/manifest 的唯一权威；renderer 不再在 spawn
   // 事件后另发查询拼接第二份状态，避免并发 child 的 in-flight refresh 丢更新。
   const subagents = snapshot?.subagents ?? EMPTY_SUBAGENT_PROJECTION;
+  // Subagent stall notifications: observe this pane's conversation snapshot (the authoritative row
+  // window). Only the interactive transcript pane notifies — the read-only nested transcripts
+  // (workflow actor / subagent child pane) are observation views and must not re-notify their parent.
+  const notificationEnabled = useMesaCodeStoreWithDefault(
+    (state) => state.notificationEnabled,
+    true,
+  );
+  const notificationPreferences = useMesaCodeStoreWithDefault(
+    (state) => state.notificationPreferences,
+    DEFAULT_TASK_NOTIFICATION_PREFERENCES,
+  );
+  useSubagentTaskNotifications({
+    enabled: notificationEnabled && !readOnly,
+    snapshot,
+    platform,
+    preferences: notificationPreferences,
+    workspacePath,
+    ...(workspaceIdentity ? { workspaceIdentity } : {}),
+    ...(remoteSessionId ? { endpointKey: remoteSessionId } : {}),
+    formatMessage: intl.formatMessage,
+  });
   useEffect(() => {
     if (!sessionId || subagents.revision === 0 || !onSyncSubagentSessionTabs) return;
     onSyncSubagentSessionTabs({

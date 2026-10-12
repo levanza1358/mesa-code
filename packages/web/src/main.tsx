@@ -12,6 +12,7 @@ import {
 import "@mesa-code/ui/styles.css";
 import { applyTheme } from "@mesa-code/ui/useTheme";
 import { connectViaWebSocket } from "@mesa-code/client";
+import { ensureCryptoRandomUuid } from "@mesa-code/shared";
 import { WebCallbackPage } from "./auth/WebCallbackPage.js";
 import { createWebAuthService } from "./auth/webAuthService.js";
 import { WEB_ZAI_OAUTH_CONFIG, resolveWebAuthDevReturnTo } from "./auth/webZaiOAuthConfig.js";
@@ -36,6 +37,13 @@ function resolveWebThemePreference(defaultTheme: Theme = WEB_DEFAULT_THEME): The
   const saved = localStorage.getItem("mesa-code-theme");
   return resolveWebInitialTheme({ storedTheme: saved, defaultTheme });
 }
+
+// Non-secure contexts (the LAN / Tailscale mirror opened on a phone over plain
+// http://<ip>) expose `crypto.getRandomValues` but not `crypto.randomUUID`. The
+// app calls `crypto.randomUUID()` directly in many places, so install the
+// fallback before anything renders or it crashes on first paint. No-op on
+// localhost and https, and in the desktop renderer.
+ensureCryptoRandomUuid();
 
 // 初始化主题：默认 Zai dark，后续由 useTheme hook 接管
 // system 模式下需要查询系统偏好；非 system 模式直接用存储值
@@ -403,6 +411,130 @@ function renderWebBootstrapError(error: unknown): void {
   );
 }
 
+type WebServices = Awaited<ReturnType<typeof connectViaWebSocket>>;
+
+function renderWebApp(
+  services: WebServices,
+  bootstrap: WebBootstrapResult,
+  generation: number,
+): void {
+  const platform = createWebPlatform();
+  document.title = "Mesa Code - Web + Server";
+
+  root.render(
+    <AppErrorBoundary>
+      <MesaCodeIntlProvider
+        settingService={services.settingService}
+        broadcastService={services.broadcastService}
+      >
+        <Root
+          // A reconnect mints a new accessor whose proxies capture a new channel; the
+          // key remounts the tree so every consumer re-reads the fresh services and the
+          // store/context rebuild instead of silently reusing the dead one.
+          key={generation}
+          services={services}
+          platform={platform}
+          initialWorkspaceAbsPath={bootstrap.initialWorkspaceAbsPath}
+          initialWorkspaceIdentity={bootstrap.initialWorkspaceIdentity}
+          initialTaskId={bootstrap.initialTaskId}
+          restoreSession={bootstrap.restoreSession}
+          allowOpenWorkspace={bootstrap.allowOpenWorkspace}
+          preferDirectoryBrowser
+          supportsEmbeddedBrowser={false}
+          allowRemoteWorkspace={false}
+        />
+      </MesaCodeIntlProvider>
+    </AppErrorBoundary>,
+  );
+}
+
+/**
+ * Reconnect owner for the web/LAN client.
+ *
+ * The phone mirror opens the WebSocket once; when the phone locks the screen or the
+ * tab is backgrounded the OS closes it, and every RPC would otherwise hang. This
+ * controller reconnects once the page is visible again and remounts the app on the
+ * fresh accessor. The session runtime lives on the Host, so no session state is
+ * invented here; see docs/specs/web-remote-reconnect.md.
+ */
+function createWebAppController(bootstrap: WebBootstrapResult) {
+  let generation = 0;
+  let transportEnded = false;
+  let reconnectInFlight = false;
+  // Identifies the current connection so a late end-event from a replaced socket
+  // cannot be mistaken for the live one dying.
+  let activeConnectionId = 0;
+
+  const connect = (): Promise<WebServices> => {
+    const connectionId = ++activeConnectionId;
+    return connectViaWebSocket(bootstrap.wsUrl, {
+      onEnd: () => {
+        if (connectionId !== activeConnectionId) {
+          return;
+        }
+        transportEnded = true;
+        // If the socket died while the page was still visible (e.g. a transient
+        // network drop) recover immediately; if it died while hidden, wait for the
+        // resume event so we do not reconnect against a suspended radio.
+        if (document.visibilityState === "visible") {
+          scheduleReconnect();
+        }
+      },
+    });
+  };
+
+  const mount = (services: WebServices): void => {
+    generation += 1;
+    transportEnded = false;
+    renderWebApp(services, bootstrap, generation);
+  };
+
+  const reconnect = async (): Promise<void> => {
+    if (reconnectInFlight) {
+      return;
+    }
+    reconnectInFlight = true;
+    try {
+      const services = await connect();
+      mount(services);
+    } catch {
+      // Keep transportEnded set so the next resume retries; the old tree is still on
+      // screen but inert until a reconnect succeeds.
+      transportEnded = true;
+    } finally {
+      reconnectInFlight = false;
+    }
+  };
+
+  const scheduleReconnect = (): void => {
+    window.setTimeout(() => {
+      if (transportEnded) {
+        void reconnect();
+      }
+    }, 0);
+  };
+
+  const handleResume = (): void => {
+    if (document.visibilityState === "hidden") {
+      return;
+    }
+    // A restored BFCache page (pageshow persisted) may still be reporting its socket
+    // as live until the queued close arrives; the onEnd handler re-schedules then.
+    if (transportEnded) {
+      void reconnect();
+    }
+  };
+
+  return {
+    async start(): Promise<void> {
+      mount(await connect());
+      window.addEventListener("visibilitychange", handleResume);
+      window.addEventListener("pageshow", handleResume);
+      window.addEventListener("online", handleResume);
+    },
+  };
+}
+
 async function bootstrapWebApp() {
   const params = new URLSearchParams(window.location.search);
   if (isWebOAuthCallback(params)) {
@@ -423,34 +555,9 @@ async function bootstrapWebApp() {
     return;
   }
 
+  const controller = createWebAppController(bootstrap);
   try {
-    const services = await connectViaWebSocket(bootstrap.wsUrl, {
-      onClose: () => {},
-    });
-    const platform = createWebPlatform();
-    document.title = "Mesa Code - Web + Server";
-
-    root.render(
-      <AppErrorBoundary>
-        <MesaCodeIntlProvider
-          settingService={services.settingService}
-          broadcastService={services.broadcastService}
-        >
-          <Root
-            services={services}
-            platform={platform}
-            initialWorkspaceAbsPath={bootstrap.initialWorkspaceAbsPath}
-            initialWorkspaceIdentity={bootstrap.initialWorkspaceIdentity}
-            initialTaskId={bootstrap.initialTaskId}
-            restoreSession={bootstrap.restoreSession}
-            allowOpenWorkspace={bootstrap.allowOpenWorkspace}
-            preferDirectoryBrowser
-            supportsEmbeddedBrowser={false}
-            allowRemoteWorkspace={false}
-          />
-        </MesaCodeIntlProvider>
-      </AppErrorBoundary>,
-    );
+    await controller.start();
   } catch (error) {
     renderWebBootstrapError(error);
   }

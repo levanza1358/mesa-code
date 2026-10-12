@@ -10,6 +10,7 @@ import { PermissionDialog } from "@/PermissionDialog.js";
 import { useOptionalPlatform } from "@/hooks/usePlatform.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
 import { usePendingInteractionTaskNotifications } from "@/hooks/useTaskNotifications.js";
+import { DEFAULT_TASK_NOTIFICATION_PREFERENCES } from "@/lib/taskNotificationPreferences.js";
 import { useNotificationPill } from "@/hooks/use-notification-pill.js";
 import { logger } from "@/logger.js";
 import { useMesaCodeStoreWithDefault } from "@/store/StoreProvider.js";
@@ -21,6 +22,7 @@ import {
 } from "@/store/mesa-code-session-store.js";
 import type { ElicitationFormDraft } from "@/store/mesa-code-session-store-types.js";
 import { createCommandEnvelope } from "@/v4/commandFactory.js";
+import { createInteractionAutoResolutionIntentTracker } from "@/v4/interactionAutoResolutionIntentTracker.js";
 import { pendingCommandRegistry } from "@/v4/pendingCommandRegistry.js";
 import { sendInteractionAutoResolutionSnooze } from "@/v4/interactionAutoResolutionCommand.js";
 import {
@@ -51,32 +53,6 @@ function getCurrentSessionInteractionSnapshot(
 
 function buildV4ElicitationProgressKey(request: MesaCodeElicitationRequest): string {
   return `${request.requestId}:${request.currentQuestionIndex ?? 0}:${JSON.stringify(request.answerDrafts ?? {})}`;
-}
-
-interface InteractionAutoResolutionIntentTracker {
-  markInteracted(interactionId: string): void;
-  consumeSnooze(interactionId: string, autoResolutionReady: boolean): boolean;
-  releaseSnooze(interactionId: string): void;
-}
-
-function createInteractionAutoResolutionIntentTracker(): InteractionAutoResolutionIntentTracker {
-  const interactedIds = new Set<string>();
-  const sentIds = new Set<string>();
-  return {
-    markInteracted(interactionId) {
-      interactedIds.add(interactionId);
-    },
-    consumeSnooze(interactionId, autoResolutionReady) {
-      if (!autoResolutionReady || !interactedIds.has(interactionId) || sentIds.has(interactionId)) {
-        return false;
-      }
-      sentIds.add(interactionId);
-      return true;
-    },
-    releaseSnooze(interactionId) {
-      sentIds.delete(interactionId);
-    },
-  };
 }
 
 /**
@@ -118,6 +94,10 @@ export function V4InteractionDialogs({
     (state) => state.notificationEnabled,
     true,
   );
+  const notificationPreferences = useMesaCodeStoreWithDefault(
+    (state) => state.notificationPreferences,
+    DEFAULT_TASK_NOTIFICATION_PREFERENCES,
+  );
   const localElicitationDraft = useMesaCodeSessionStore((state) => {
     if (!pending || pending.payload.kind !== "userInput") return undefined;
     return getTaskUiState(getWorkspaceState(state, workspacePath, workspaceIdentity), sessionId)
@@ -127,6 +107,7 @@ export function V4InteractionDialogs({
     snapshot: currentSnapshot,
     enabled: notificationEnabled,
     platform,
+    preferences: notificationPreferences,
     formatMessage: intl.formatMessage,
   });
   useEffect(() => {
@@ -220,6 +201,15 @@ export function V4InteractionDialogs({
     [onCommandSettled, sendCommand, sessionId],
   );
 
+  const removeElicitationDraft = useCallback(
+    (requestId: string) => {
+      useMesaCodeSessionStore
+        .getState()
+        .removeTaskElicitationFormDraft(workspacePath, sessionId, requestId, workspaceIdentity);
+    },
+    [sessionId, workspaceIdentity, workspacePath],
+  );
+
   const respondPermission = useCallback(
     async (interactionId: string, optionId: string, feedback?: string) => {
       if (permissionResponseFlight.current === interactionId) return false;
@@ -236,6 +226,21 @@ export function V4InteractionDialogs({
       return accepted;
     },
     [resolveInteraction],
+  );
+  const respondUserInput = useCallback(
+    async (interactionId: string, content: Record<string, unknown>) => {
+      if (permissionResponseFlight.current === interactionId) return false;
+      permissionResponseFlight.current = interactionId;
+      setPermissionResponse({ interactionId, pending: true, failed: false });
+      const accepted = await resolveInteraction(interactionId, { action: "accept", content });
+      if (permissionResponseFlight.current === interactionId) {
+        permissionResponseFlight.current = null;
+        setPermissionResponse({ interactionId, pending: false, failed: !accepted });
+      }
+      if (accepted) removeElicitationDraft(interactionId);
+      return accepted;
+    },
+    [resolveInteraction, removeElicitationDraft],
   );
   useNotificationPill({
     platform,
@@ -254,6 +259,7 @@ export function V4InteractionDialogs({
       permissionResponse?.interactionId === pending?.interactionId &&
       Boolean(permissionResponse?.failed),
     respond: respondPermission,
+    respondUserInput,
   });
 
   const snoozeAutoResolution = useCallback(
@@ -274,15 +280,6 @@ export function V4InteractionDialogs({
       useMesaCodeSessionStore
         .getState()
         .setTaskElicitationFormDraft(workspacePath, sessionId, requestId, draft, workspaceIdentity);
-    },
-    [sessionId, workspaceIdentity, workspacePath],
-  );
-
-  const removeElicitationDraft = useCallback(
-    (requestId: string) => {
-      useMesaCodeSessionStore
-        .getState()
-        .removeTaskElicitationFormDraft(workspacePath, sessionId, requestId, workspaceIdentity);
     },
     [sessionId, workspaceIdentity, workspacePath],
   );

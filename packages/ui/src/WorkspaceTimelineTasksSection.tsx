@@ -5,6 +5,7 @@ import type { MesaCodeTaskMeta } from "@mesa-code/shared";
 import { toast } from "@/components/ui/toast.js";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu.js";
 import { useGlobalTaskList } from "@/hooks/useGlobalTaskList.js";
+import { useIsTouchInput } from "@/hooks/useIsTouchInput.js";
 import { useLocalWorkspaceScopes } from "@/hooks/useLocalWorkspaceScopes.js";
 import { useBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
@@ -65,6 +66,8 @@ export function WorkspaceTimelineTasksSection({
   ) => void;
 }) {
   const { intl, locale } = useMesaCodeIntl();
+  // Touch input has no right-click; the rows render a "…" menu instead.
+  const isTouchInput = useIsTouchInput();
   const baseServices = useBaseWorkspaceServices();
   const scopedWorkspaceTabs = useLocalWorkspaceScopes({
     workspaceTabs,
@@ -181,7 +184,9 @@ export function WorkspaceTimelineTasksSection({
     const pinnedIds = new Set<string>();
     for (const workspaceKey of remoteWorkspaceKeys) {
       for (const task of remotePinnedTasksByWorkspaceKey[workspaceKey] ?? []) {
-        pinnedIds.add(buildTimelineItemKey(task.workspacePath, task.taskId, task.workspaceIdentity));
+        pinnedIds.add(
+          buildTimelineItemKey(task.workspacePath, task.taskId, task.workspaceIdentity),
+        );
       }
     }
     return pinnedIds;
@@ -739,6 +744,7 @@ export function WorkspaceTimelineTasksSection({
                           onMarkTaskAsUnread={handlers.onMarkTaskAsUnread}
                           onOpenTaskContextMenu={handlers.onOpenTaskContextMenu}
                           intl={intl}
+                          showMoreMenu={isTouchInput}
                         />
                       );
                     })}

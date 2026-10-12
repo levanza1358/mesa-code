@@ -33,10 +33,9 @@ function shouldSuppressDuplicateTaskNotification(
 
   // elicitation_request 和 permission_request 一样代表一次具体的人机阻塞请求。
   // 如果仍按 taskId 去重，同一任务连续 AskUserQuestion/计划确认会在 3 秒内漏掉第二条通知。
-  const dedupeTarget =
-    status === "permission_request" || status === "elicitation_request"
-      ? requestId?.trim() || taskId
-      : taskId;
+  // subagent_stalled 也会带 requestId（子代理行 id）：同一会话并发多个子代理停止时，
+  // 若按 taskId 去重会互相吞掉，因此这里对任何携带 requestId 的通知都按 requestId 去重。
+  const dedupeTarget = requestId?.trim() || taskId;
   const dedupeKey = `${status}:${dedupeTarget}`;
   const lastTimestamp = recentTaskNotificationTimestamps.get(dedupeKey);
   if (lastTimestamp != null && now - lastTimestamp < TASK_NOTIFICATION_DEDUPE_WINDOW_MS) {

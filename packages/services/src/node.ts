@@ -450,6 +450,7 @@ import { IOffPeakTaskService } from "./session/offPeakTask.js";
 import { OffPeakTaskService } from "./session/offPeakTaskService.js";
 import { OffPeakTaskRepo } from "./session/offPeakTaskRepo.js";
 import { createOffPeakServerClient } from "./session/offPeakServerClient.js";
+import { INetworkAccessService } from "./network-access/networkAccess.js";
 import {
   buildOffPeakRequestAuth,
   createOffPeakOriginResolver,
@@ -2733,6 +2734,8 @@ export function disposeServiceResources(services: ServiceCollection): void {
     services.getOptional(IMesaCodeSessionService),
     services.getOptional(IFileWatcherService),
     services.getOptional(IOffPeakTaskService),
+    // Desktop-host-only; absent on other hosts. Releases the LAN listener port.
+    services.getOptional(INetworkAccessService),
   ].filter((service) => service !== undefined);
 
   for (const service of disposableServices) {
@@ -2766,6 +2769,7 @@ export async function disposeServiceResourcesAndWait(services: ServiceCollection
     services.getOptional(IMesaCodeSessionService),
     services.getOptional(IFileWatcherService),
     services.getOptional(IOffPeakTaskService),
+    services.getOptional(INetworkAccessService),
   ].filter((service) => service !== undefined);
 
   for (const service of disposableServices) {

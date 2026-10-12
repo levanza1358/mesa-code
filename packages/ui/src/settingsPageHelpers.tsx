@@ -40,8 +40,6 @@ const MESA_CODE_INTERACTION_BEHAVIOR_OPTIONS: readonly MesaCodeInteractionBehavi
 ];
 
 export function GeneralSectionContent({
-  notificationEnabled,
-  notificationSoundEnabled,
   desktopTrayEnabled = true,
   closeToTrayOnWindows,
   minimizeToTrayOnDesktop = false,
@@ -61,8 +59,6 @@ export function GeneralSectionContent({
   defaultHomeDir,
   isDesktop,
   showIntegratedTerminalShell = false,
-  setNotificationEnabled,
-  setNotificationSoundEnabled,
   taskAutoArchiveEnabled,
   taskAutoArchiveOlderThanDays,
   messageStreamShowReasoning,
@@ -100,8 +96,6 @@ export function GeneralSectionContent({
   onAskUserQuestionAutoResolutionEnabledChange = async () => {},
   onModelIoFullRetentionEnabledChange = async () => {},
 }: {
-  notificationEnabled: boolean;
-  notificationSoundEnabled: boolean;
   desktopTrayEnabled?: boolean;
   closeToTrayOnWindows: boolean;
   minimizeToTrayOnDesktop?: boolean;
@@ -122,8 +116,6 @@ export function GeneralSectionContent({
   isDesktop?: boolean;
   showIntegratedTerminalShell?: boolean;
   platform?: IPlatformService;
-  setNotificationEnabled: (enabled: boolean) => void;
-  setNotificationSoundEnabled: (enabled: boolean) => void;
   taskAutoArchiveEnabled: boolean;
   taskAutoArchiveOlderThanDays: number;
   messageStreamShowReasoning: boolean;
@@ -527,28 +519,6 @@ export function GeneralSectionContent({
             />
           </>
         ) : null}
-        <SettingsRow
-          label={intl.formatMessage({ id: "settings.notification" })}
-          description={intl.formatMessage({
-            id: "settings.notificationDescription",
-          })}
-          control={
-            <Switch checked={notificationEnabled} onCheckedChange={setNotificationEnabled} />
-          }
-        />
-        <SettingsRow
-          label={intl.formatMessage({ id: "settings.notificationSound" })}
-          description={intl.formatMessage({
-            id: "settings.notificationSoundDescription",
-          })}
-          control={
-            <Switch
-              checked={notificationSoundEnabled}
-              disabled={!notificationEnabled}
-              onCheckedChange={setNotificationSoundEnabled}
-            />
-          }
-        />
         {isDesktop ? (
           <>
             <SettingsRow

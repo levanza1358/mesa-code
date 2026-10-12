@@ -4,7 +4,7 @@ import {
 } from "@/lib/markdownFileLink.js";
 import { extractConversationPreviewFileReferences } from "@mesa-code/shared";
 import { decodeFilePathUriEscapes, joinFilePath } from "@/lib/path.js";
-import { MEDIA_PREVIEW_FORMATS } from "@mesa-code/shared";
+import { IMAGE_PREVIEW_FORMATS, MEDIA_PREVIEW_FORMATS } from "@mesa-code/shared";
 import {
   extractMesaCodeFileCitationDirectives,
   resolveMesaCodeFileCitationPreviewKind,
@@ -22,6 +22,7 @@ export type AssistantPreviewFileKind =
   | "xlsx"
   | "pptx"
   | "pdf"
+  | "image"
   | "video"
   | "audio";
 
@@ -32,6 +33,7 @@ export type AssistantPreviewFileSubtitleId =
   | "chat.previewCards.xlsx"
   | "chat.previewCards.pptx"
   | "chat.previewCards.pdf"
+  | "chat.previewCards.image"
   | "chat.previewCards.video"
   | "chat.previewCards.audio";
 
@@ -63,6 +65,13 @@ const ASSISTANT_PREVIEW_FILE_TYPES: readonly AssistantPreviewFileTypeDefinition[
   { extensions: [".xlsx"], kind: "xlsx", subtitleId: "chat.previewCards.xlsx" },
   { extensions: [".pptx"], kind: "pptx", subtitleId: "chat.previewCards.pptx" },
   { extensions: [".pdf"], kind: "pdf", subtitleId: "chat.previewCards.pdf" },
+  ...IMAGE_PREVIEW_FORMATS.map(
+    ({ extension }): AssistantPreviewFileTypeDefinition => ({
+      extensions: [extension],
+      kind: "image",
+      subtitleId: "chat.previewCards.image",
+    }),
+  ),
   ...MEDIA_PREVIEW_FORMATS.map(
     ({ extension, kind }): AssistantPreviewFileTypeDefinition => ({
       extensions: [extension],
@@ -75,9 +84,9 @@ const ASSISTANT_PREVIEW_FILE_TYPES: readonly AssistantPreviewFileTypeDefinition[
 const FILE_URL_RE = /\bfile:\/\/[^\s<>()\]`"'*“”‘’，。！？；：、]+/gi;
 const MARKDOWN_LINK_RE = /\[([^\]\n]*)\]\(([^)\n]+)\)/g;
 const DELIMITED_FILE_PATH_RE =
-  /([`"'“”‘’])([^`"'“”‘’\r\n]+?\.(?:md|html?|docx|xlsx|pptx|pdf|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)([`"'“”‘’])/giu;
+  /([`"'“”‘’])([^`"'“”‘’\r\n]+?\.(?:md|html?|docx|xlsx|pptx|pdf|png|jpe?g|gif|webp|avif|bmp|svg|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)([`"'“”‘’])/giu;
 const FILE_PATH_RE =
-  /(?:^|[\s("'`“”‘’,.;:!?，。！？；：、])((?:(?:\.{1,2}[\\/]|[a-zA-Z]:[\\/]|\/|[\p{L}\p{N}\p{M}\p{S}_.@()-]+[\\/])[\p{L}\p{N}\p{M}\p{S}_.@() -]+?(?:[\\/][\p{L}\p{N}\p{M}\p{S}_.@() -]+?)*|[\p{L}\p{N}\p{M}\p{S}_.@()-]+)\.(?:md|html?|docx|xlsx|pptx|pdf|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)(?=$|[\s)"'`“”‘’,.;:!?，。！？；：、])/giu;
+  /(?:^|[\s("'`“”‘’,.;:!?，。！？；：、])((?:(?:\.{1,2}[\\/]|[a-zA-Z]:[\\/]|\/|[\p{L}\p{N}\p{M}\p{S}_.@()-]+[\\/])[\p{L}\p{N}\p{M}\p{S}_.@() -]+?(?:[\\/][\p{L}\p{N}\p{M}\p{S}_.@() -]+?)*|[\p{L}\p{N}\p{M}\p{S}_.@()-]+)\.(?:md|html?|docx|xlsx|pptx|pdf|png|jpe?g|gif|webp|avif|bmp|svg|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)(?=$|[\s)"'`“”‘’,.;:!?，。！？；：、])/giu;
 
 export function cleanAssistantFilePathCandidate(candidate: string): string {
   return candidate

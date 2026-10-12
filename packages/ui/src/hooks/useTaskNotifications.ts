@@ -12,10 +12,14 @@ import type { ConversationSnapshot, SessionSummary } from "@mesa-code/shared/mes
 import { useServices } from "@/hooks/useServices.js";
 import type { IntlInstance } from "@/i18n/index.js";
 import { logger } from "@/logger.js";
+import { toast } from "@/components/ui/toast.js";
 import {
   collectPendingInteractionNotificationPayloads,
   collectTerminalTaskNotificationPayloads,
 } from "@/lib/taskNotificationOrchestrator.js";
+import { decideTaskNotificationDelivery } from "@/lib/taskNotificationRouting.js";
+import type { TaskNotificationPreferences } from "@/lib/taskNotificationPreferences.js";
+import { isWindowFocused } from "@/lib/windowFocus.js";
 import {
   acquireSessionsIndex,
   releaseSessionsIndex,
@@ -36,6 +40,7 @@ interface WorkspaceTerminalTaskNotificationsParams {
   enabled: boolean;
   rpcReady: boolean;
   platform: TaskNotificationPlatform | null | undefined;
+  preferences: TaskNotificationPreferences;
   formatMessage: FormatMessage;
 }
 
@@ -43,6 +48,7 @@ interface PendingInteractionTaskNotificationsParams {
   snapshot: ConversationSnapshot | null;
   enabled: boolean;
   platform: TaskNotificationPlatform | null | undefined;
+  preferences: TaskNotificationPreferences;
   formatMessage: FormatMessage;
 }
 
@@ -93,8 +99,11 @@ function showTaskNotification(
  *
  * v4 重构删掉旧 renderer background monitor 后，platform 通知通道仍在，
  * 但 sessions-index 事实没有再被翻译成展示命令，导致任务完成/失败没有系统通知。
- * 这里只在 renderer 做“已观察边沿”的通知意图，事实仍以 sessions-index 为准；
- * 是否因窗口活跃而抑制通知继续交给 desktop/web platform 层判断。
+ * 这里只在 renderer 做“已观察边沿”的通知意图，事实仍以 sessions-index 为准。
+ *
+ * 展示路由（docs/specs/notification-settings.md rule 4）：窗口获得焦点时平台层会抑制
+ * OS 通知与 pill，所以焦点态改由应用内 toast 承担；失焦态继续走 OS 通知 + pill。
+ * 通道开关、事件开关与“焦点时静默”都读同一份偏好记录。
  */
 export function useWorkspaceTerminalTaskNotifications({
   workspacePath,
@@ -103,6 +112,7 @@ export function useWorkspaceTerminalTaskNotifications({
   enabled,
   rpcReady,
   platform,
+  preferences,
   formatMessage,
 }: WorkspaceTerminalTaskNotificationsParams): void {
   const { mesaCodeAgentService } = useServices();
@@ -247,36 +257,57 @@ export function useWorkspaceTerminalTaskNotifications({
       sessions: indexState.sessions,
       formatMessage,
     });
+    const focused = isWindowFocused();
     for (const payload of payloads) {
-      showTaskNotification(platform, payload);
+      const event = payload.status === "failed" ? "failed" : "completed";
+      const delivery = decideTaskNotificationDelivery({ preferences, event, focused });
+      if (!delivery.toast && !delivery.os && !delivery.pill) continue;
+
       const session = nextBySessionId.get(payload.taskId);
-      const token = crypto.randomUUID();
-      const presentation: NotificationPillPresentation = {
-        token,
-        kind: "status",
-        context: {
-          taskId: payload.taskId,
-          workspacePath,
-          workspaceIdentity,
-          ...(endpointKey ? { remoteSessionId: endpointKey } : {}),
-        },
-        title: payload.title.slice(0, 512),
-        body: payload.body.slice(0, 512),
-        preview: notificationPillPreview(session?.lastAssistantPreview),
-        openLabel: formatMessage({ id: "notification.pill.open" }),
-        error: "",
-        busy: false,
-        options: [],
-        appearance: readNotificationPillAppearance(),
-      };
-      pillRef.current = presentation;
-      pillStatusRef.current = payload.status;
-      pillTaskTitleRef.current = session?.title ?? "";
-      pillExpiryRef.current = Date.now() + 8000;
-      platform.presentNotificationPill?.({ token, presentation });
+      if (delivery.toast) {
+        // The in-app toast is the focused-window channel (the platform suppresses OS/pill while
+        // focused). It honors the configured position and duration.
+        toast(payload.body || payload.title, {
+          position: preferences.position,
+          durationMs: preferences.durationMs,
+          variant: payload.status === "failed" ? "warning" : "default",
+          dedupeKey: `task-notification:${payload.taskId}:${payload.status}`,
+        });
+      }
+      if (delivery.os) {
+        showTaskNotification(platform, payload);
+      }
+      if (delivery.pill) {
+        const token = crypto.randomUUID();
+        const presentation: NotificationPillPresentation = {
+          token,
+          kind: "status",
+          context: {
+            taskId: payload.taskId,
+            workspacePath,
+            workspaceIdentity,
+            ...(endpointKey ? { remoteSessionId: endpointKey } : {}),
+          },
+          title: payload.title.slice(0, 512),
+          body: payload.body.slice(0, 512),
+          preview: notificationPillPreview(session?.lastAssistantPreview),
+          openLabel: formatMessage({ id: "notification.pill.open" }),
+          error: "",
+          busy: false,
+          options: [],
+          position: preferences.position,
+          durationMs: preferences.durationMs,
+          appearance: readNotificationPillAppearance(),
+        };
+        pillRef.current = presentation;
+        pillStatusRef.current = payload.status;
+        pillTaskTitleRef.current = session?.title ?? "";
+        pillExpiryRef.current = Date.now() + preferences.durationMs;
+        platform.presentNotificationPill?.({ token, presentation });
+      }
     }
     previousBySessionIdRef.current = nextBySessionId;
-  }, [enabled, formatMessage, indexState, platform, signature]);
+  }, [enabled, formatMessage, indexState, platform, preferences, signature, workspaceIdentity, workspacePath, endpointKey]);
 }
 
 /**
@@ -289,6 +320,7 @@ export function usePendingInteractionTaskNotifications({
   snapshot,
   enabled,
   platform,
+  preferences,
   formatMessage,
 }: PendingInteractionTaskNotificationsParams): void {
   const seenRef = useRef<{ sessionId: string; seenRequestIds: Set<string> } | null>(null);
@@ -311,7 +343,14 @@ export function usePendingInteractionTaskNotifications({
       return;
     }
 
-    if (platform) {
+    // Permission/elicitation events route by the same rules; they are never toasted because the
+    // in-app dialog is the single place they are answered, so a focused window stays quiet here.
+    const delivery = decideTaskNotificationDelivery({
+      preferences,
+      event: "permission",
+      focused: false,
+    });
+    if (platform && delivery.os) {
       const payloads = collectPendingInteractionNotificationPayloads({
         snapshot,
         seenRequestIds: currentSeen.seenRequestIds,
@@ -325,5 +364,5 @@ export function usePendingInteractionTaskNotifications({
     for (const requestId of currentRequestIds) {
       currentSeen.seenRequestIds.add(requestId);
     }
-  }, [enabled, formatMessage, platform, snapshot]);
+  }, [enabled, formatMessage, platform, preferences, snapshot]);
 }

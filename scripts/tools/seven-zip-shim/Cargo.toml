@@ -1,0 +1,11 @@
+[package]
+name = "seven-zip-shim"
+version = "1.0.0"
+edition = "2021"
+description = "7za shim that tolerates unprivileged symlink creation on Windows installers"
+
+[[bin]]
+name = "7za"
+path = "src/main.rs"
+
+[dependencies]

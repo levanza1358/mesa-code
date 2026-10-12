@@ -122,6 +122,7 @@ export const taskNotificationPayloadSchema = z.object({
   status: z.enum([
     "completed",
     "failed",
+    "subagent_stalled",
     "permission_request",
     "elicitation_request",
     "feedback_update",

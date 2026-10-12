@@ -37,6 +37,7 @@ import type { IFeedbackService } from "./feedback/feedback.js";
 import type { IPromptAttachmentTransferService } from "./prompt-attachment-transfer/promptAttachmentTransfer.js";
 import type { IWindowControllerService } from "./window-controller/windowController.js";
 import type { IConversationShareService } from "./conversation-share/conversationShare.js";
+import type { INetworkAccessService } from "./network-access/networkAccess.js";
 
 /** UI 层消费的统一服务接口 */
 export interface IServiceAccessor {
@@ -83,4 +84,10 @@ export interface IServiceAccessor {
   readonly settingsSyncService: ISettingsSyncService;
   readonly feedbackService: IFeedbackService;
   readonly promptAttachmentTransferService: IPromptAttachmentTransferService;
+  /**
+   * Local network access (LAN/Tailscale). Desktop-host-only: absent on the web
+   * client's own accessor and on remote-workspace hosts. Optional so existing
+   * doubles and the plain web bootstrap stay valid.
+   */
+  readonly networkAccessService?: INetworkAccessService;
 }

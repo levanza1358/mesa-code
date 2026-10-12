@@ -6,7 +6,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 
-import { TID_APP_HEADER } from "@mesa-code/shared";
+import { TID_APP_HEADER, TID_MOBILE_SIDEBAR_SCRIM } from "@mesa-code/shared";
 // 保活：workspace tab 真正关闭时，按 workspaceKey 回收 side pane terminal 的常驻 PTY/xterm。
 // 对称下侧 Terminal.tsx 的 openWorkspaceKeys 回收。
 import { sidePaneTerminalSessionRegistry } from "@/terminal/sidePaneTerminalSessionRegistry.js";
@@ -70,6 +70,8 @@ import { toast } from "@/components/ui/toast.js";
 import { getGitDirtyFileCount } from "@/git-branch-switcher/display.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
 import { useBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
+import { useIsMobileWeb } from "@/hooks/useIsMobileWeb.js";
+import { MobileSidebarToggleButton } from "@/app-shell/MobileSidebarToggleButton.js";
 import { getPathLeaf, toFileUrl } from "@/lib/path.js";
 import { shouldOpenAssistantHtmlInBrowser } from "@/lib/assistantPreviewCards.js";
 import { setWorkspaceSidebarResizeActive } from "@/lib/workspaceSidebarResizeState.js";
@@ -374,6 +376,11 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
     );
   }, [openWorkspaceKeys]);
   const isSidebarPanelVisible = isSidebarVisible;
+  // Web phone layout: the sidebar becomes an off-canvas drawer and the content
+  // column loses its 320px floor. Guarded by isDesktop inside the hook, so the
+  // desktop shell keeps its in-flow, resize-handle-driven sidebar untouched.
+  const isMobileWeb = useIsMobileWeb(isDesktop);
+  const isMobileDrawerOverlay = isMobileWeb && isSidebarVisible;
   const {
     panelRef: terminalPanelRef,
     panelElementRef: terminalPanelElementRef,
@@ -502,6 +509,37 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
       window.removeEventListener("resize", handleWindowResize);
     };
   }, [workspaceMainView]);
+
+  const mobileSidebarStateRef = useRef({ isSidebarVisible, handleToggleSidebar });
+  useEffect(() => {
+    mobileSidebarStateRef.current = { isSidebarVisible, handleToggleSidebar };
+  }, [isSidebarVisible, handleToggleSidebar]);
+
+  // Mobile web: the drawer reuses the existing isSidebarVisible flag, so it needs
+  // no second source of truth. Two lifecycle rules keep it out of the way:
+  //  - on the phone layout the drawer is closed once the user has navigated to
+  //    what they came for (picked a task, or a full-screen page such as Settings or
+  //    Automations), instead of covering the page behind it;
+  //  - leaving the phone layout for a wider web view restores the in-flow sidebar.
+  // Desktop is never touched: `isMobileWeb` is always false there, so the mobile
+  // branch is skipped and the previous-value guard prevents the restore branch
+  // from ever firing on a plain task switch.
+  const wasMobileWebRef = useRef(false);
+  useEffect(() => {
+    const wasMobileWeb = wasMobileWebRef.current;
+    wasMobileWebRef.current = isMobileWeb;
+    const { isSidebarVisible: visible, handleToggleSidebar: toggle } =
+      mobileSidebarStateRef.current;
+    if (isMobileWeb) {
+      if (visible) {
+        toggle();
+      }
+      return;
+    }
+    if (wasMobileWeb && !visible) {
+      toggle();
+    }
+  }, [isMobileWeb, activeTaskId, workspaceMainView]);
 
   useEffect(() => {
     workspaceSidebarPanelWidthPxRef.current = workspaceSidebarPanelWidthPx;
@@ -1437,7 +1475,10 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
   // 手机远控无 active task 时仍不渲染桌面 chrome，继续遵守 replayable overlay 边界。
   const shouldRenderMainViewHeader = workspaceMainView !== "automations";
   const shouldRenderWorkspaceHeader =
-    shouldRenderMainViewHeader && (activeTaskId !== null || isDesktop);
+    shouldRenderMainViewHeader &&
+    // Desktop keeps the header on draft; the web phone layout needs it on draft
+    // too, because the header is the only place the navigation-drawer button lives.
+    (activeTaskId !== null || isDesktop || isMobileWeb);
   // ErrorBoundary resetKeys 的数组如果每次 render 都重新创建，
   // 即使 workspace/task 没变化也会在 React DevTools Components 轨道里持续表现为子树 props 变化。
   const workspaceOnlyResetKeys = useMemo(() => [workspaceKey], [workspaceKey]);
@@ -1476,10 +1517,24 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
           data-workspace-sidebar-panel="true"
           id="sidebar"
           className={cn(
-            "w-(--workspace-sidebar-panel-width) max-w-[50%] flex-none overflow-hidden duration-200 ease-out transition-[width,opacity] data-[workspace-sidebar-resizing=true]:transition-opacity",
+            "flex-none overflow-hidden duration-200 ease-out",
+            isMobileWeb
+              ? // Web phone layout: off-canvas drawer over the content column. It
+                // is always mounted (the sidebar owns live task/file state) and
+                // slides in from the left; the scrim below closes it.
+                "absolute inset-y-0 left-0 z-40 w-[min(85vw,320px)] max-w-none transition-transform"
+              : // Desktop / wide web: in-flow column whose width is driven by the
+                // CSS var so a window resize only triggers browser layout.
+                "w-(--workspace-sidebar-panel-width) max-w-[50%] transition-[width,opacity] data-[workspace-sidebar-resizing=true]:transition-opacity",
             // 拖动侧栏宽度时如果继续过渡 width，会让指针移动和实际宽度之间产生滞后。
             // 拖拽 active 通过 DOM 标记切 transition，避免 pointerdown/up 为了切 class 重渲染整棵 workspace。
-            isSidebarPanelVisible ? "opacity-100" : "pointer-events-none opacity-0",
+            isMobileWeb
+              ? isSidebarPanelVisible
+                ? "translate-x-0"
+                : "pointer-events-none -translate-x-full"
+              : isSidebarPanelVisible
+                ? "opacity-100"
+                : "pointer-events-none opacity-0",
           )}
         >
           <aside
@@ -1545,7 +1600,19 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
           </aside>
         </div>
 
-        {isSidebarVisible ? (
+        {/* Web phone layout: a scrim behind the open drawer. Tapping it (or the
+            toggle in the header) closes the drawer; the chat stays visible behind
+            it. Desktop never renders this. */}
+        {isMobileDrawerOverlay ? (
+          <div
+            aria-hidden="true"
+            data-testid={TID_MOBILE_SIDEBAR_SCRIM}
+            onClick={handleToggleSidebar}
+            className="absolute inset-0 z-30 bg-black/40"
+          />
+        ) : null}
+
+        {isSidebarVisible && !isMobileWeb ? (
           <div
             role="separator"
             tabIndex={0}
@@ -1573,7 +1640,8 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
           data-panel=""
           id="content"
           className={cn(
-            "flex min-w-[320px] flex-1 flex-col",
+            "flex flex-1 flex-col",
+            !isMobileWeb && "min-w-[320px]",
             hasDesktopPanelInset ? "p-1 pl-0 pt-0" : "p-0",
           )}
         >
@@ -1662,6 +1730,7 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                             isWindowsDesktop={isWindowsDesktop}
                             useWindowsCaptionSpacing={Boolean(isWindowsDesktop)}
                             isDesktop={isDesktop}
+                            isMobileWeb={isMobileWeb}
                             isSidebarVisible={isSidebarVisible}
                             isTerminalOpen={isTerminalOpen}
                             isSidePaneOpen={isSidePaneOpen}
@@ -1669,6 +1738,11 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                             onToggleTerminal={handleToggleTerminal}
                             onToggleBrowser={handleToggleBrowser}
                             onToggleSidePane={handleToggleSidePane}
+                            onToggleSidebar={handleToggleSidebar}
+                            onGoBack={primaryNavigationBack}
+                            onGoForward={handleTaskNavForward}
+                            canGoBack={canPrimaryNavigationBack}
+                            canGoForward={canTaskNavForward}
                             toggleSidePaneShortcutLabel={toggleSidePaneShortcutLabel}
                             onReloadSession={handleReloadSession}
                             reloadSessionDisabled={workspaceSessionActionDisabled}
@@ -1685,6 +1759,16 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                             id={AUTOMATIONS_TOAST_ANCHOR_ID}
                             className="flex h-full min-h-0 flex-1 flex-col bg-background"
                           >
+                            {/* Automations is a full-screen main view with no workspace
+                                header. On the web phone layout the sidebar is an
+                                off-canvas drawer, so without this the user would be
+                                stranded here with no way back; render the same drawer
+                                toggle as a leading control. Desktop never renders it. */}
+                            {isMobileWeb ? (
+                              <div className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-2 [app-region:no-drag]">
+                                <MobileSidebarToggleButton onToggleSidebar={handleToggleSidebar} />
+                              </div>
+                            ) : null}
                             <AutomationsMainBreadcrumbFrame
                               isDesktop={Boolean(isDesktop)}
                               sectionLabel={intl.formatMessage({
@@ -1873,40 +1957,46 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
             toggleSidePaneShortcutLabel={toggleSidePaneShortcutLabel}
           />
         ) : null}
-        <ScopedErrorBoundary
-          scope="desktop-top-overlay"
-          resetKeys={workspaceSidebarVisibilityResetKeys}
-          variant="silent"
-        >
-          <DesktopTopOverlay
-            newTaskDisabledReason={workspaceReadOnlyReason}
-            workspaceAbsPath={workspaceAbsPath}
-            isMacDesktop={isMacDesktop}
-            isMacFullscreen={isMacFullscreen}
-            macWindowControlsLeftPaddingPx={macWindowControlsLeftPaddingPx}
-            windowsWindowControlsRightPaddingPx={windowsWindowControlsRightPaddingPx}
-            isWindowsDesktop={isWindowsDesktop}
-            isDesktop={isDesktop}
-            isSidebarVisible={isSidebarVisible}
-            updateReadyVersion={updateReadyVersion}
-            updateState={updateState}
-            toggleSidebarShortcutLabel={toggleSidebarShortcutLabel}
-            newTaskShortcutLabel={newTaskShortcutLabel}
-            goBackShortcutLabel={goBackShortcutLabel}
-            goForwardShortcutLabel={goForwardShortcutLabel}
-            canTaskNavBack={canPrimaryNavigationBack}
-            canTaskNavForward={canTaskNavForward}
-            canGoBack={canGoBack}
-            canGoForward={canGoForward}
-            showNewTaskButton={showTopOverlayNewTaskButton}
-            appLogoUrl={appLogoUrl}
-            platform={platform}
-            onToggleSidebar={handleToggleSidebar}
-            onCreateTask={handleCreateTaskInChat}
-            onGoBack={primaryNavigationBack}
-            onGoForward={handleTaskNavForward}
-          />
-        </ScopedErrorBoundary>
+        {/* Web phone layout: the floating overlay is absolutely positioned at the
+            top-left and would overlap the workspace header, which already carries
+            the drawer and task-navigation buttons inline. Hide it entirely there;
+            desktop keeps it (it owns the sidebar toggle + new task). */}
+        {!isMobileWeb ? (
+          <ScopedErrorBoundary
+            scope="desktop-top-overlay"
+            resetKeys={workspaceSidebarVisibilityResetKeys}
+            variant="silent"
+          >
+            <DesktopTopOverlay
+              newTaskDisabledReason={workspaceReadOnlyReason}
+              workspaceAbsPath={workspaceAbsPath}
+              isMacDesktop={isMacDesktop}
+              isMacFullscreen={isMacFullscreen}
+              macWindowControlsLeftPaddingPx={macWindowControlsLeftPaddingPx}
+              windowsWindowControlsRightPaddingPx={windowsWindowControlsRightPaddingPx}
+              isWindowsDesktop={isWindowsDesktop}
+              isDesktop={isDesktop}
+              isSidebarVisible={isSidebarVisible}
+              updateReadyVersion={updateReadyVersion}
+              updateState={updateState}
+              toggleSidebarShortcutLabel={toggleSidebarShortcutLabel}
+              newTaskShortcutLabel={newTaskShortcutLabel}
+              goBackShortcutLabel={goBackShortcutLabel}
+              goForwardShortcutLabel={goForwardShortcutLabel}
+              canTaskNavBack={canPrimaryNavigationBack}
+              canTaskNavForward={canTaskNavForward}
+              canGoBack={canGoBack}
+              canGoForward={canGoForward}
+              showNewTaskButton={showTopOverlayNewTaskButton}
+              appLogoUrl={appLogoUrl}
+              platform={platform}
+              onToggleSidebar={handleToggleSidebar}
+              onCreateTask={handleCreateTaskInChat}
+              onGoBack={primaryNavigationBack}
+              onGoForward={handleTaskNavForward}
+            />
+          </ScopedErrorBoundary>
+        ) : null}
       </div>
     </DesktopWindowFrame>
   );

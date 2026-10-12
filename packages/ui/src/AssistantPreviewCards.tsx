@@ -1,8 +1,11 @@
 import { FileTextIcon, GlobeIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { MessageFileLinkTarget } from "@/components/ai-elements/message.js";
+import { ImagePreviewDialog } from "@/components/ai-elements/image-preview-dialog.js";
 import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
+import { logger } from "@/logger.js";
+import type { FileMediaPreview } from "@mesa-code/shared";
 import {
   type AssistantPreviewCard,
   type AssistantPreviewCardFileStatService,
@@ -272,6 +275,10 @@ function AssistantPreviewCardRow({
     workspaceRemoteSessionId,
   });
   const descriptor = filePath ? resolveFileDisplayDescriptor(filePath) : null;
+  // Inline image preview: generated images are shown as thumbnails, not just a path.
+  // Bytes come from the Host through the same file-read RPC the markdown image uses, so
+  // this works on desktop and on the phone/LAN web client alike.
+  const isImageCard = card.type === "file" && card.kind === "image" && filePath !== null;
   const fileSource =
     renderAsFile && filePath
       ? {
@@ -283,6 +290,15 @@ function AssistantPreviewCardRow({
           ...(workspaceRemoteSessionId ? { workspaceRemoteSessionId } : {}),
         }
       : null;
+  const imageThumbnail = isImageCard ? (
+    <AssistantPreviewCardImageThumbnail
+      path={filePath}
+      title={card.title}
+      workspacePath={workspacePath}
+      workspaceIdentity={workspaceIdentity}
+      workspaceRemoteSessionId={workspaceRemoteSessionId}
+    />
+  ) : null;
   return (
     <div
       className="flex w-full items-center gap-3 rounded-xl border border-card-border bg-card p-3 pr-4 text-foreground"
@@ -293,8 +309,10 @@ function AssistantPreviewCardRow({
         } as CSSProperties
       }
     >
-      <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-background text-foreground-subtle">
-        {!renderAsFile && card.type === "website" ? (
+      <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-background text-foreground-subtle">
+        {imageThumbnail ? (
+          imageThumbnail
+        ) : !renderAsFile && card.type === "website" ? (
           <GlobeIcon className="size-6" />
         ) : descriptor ? (
           <FileDisplayIcon src={descriptor.fileIconSrc} size={24} />
@@ -339,5 +357,85 @@ function AssistantPreviewCardRow({
         onOpenCodeViewer={onOpenCodeViewer}
       />
     </div>
+  );
+}
+
+function formatImagePreviewDataUrl(preview: FileMediaPreview): string {
+  return `data:${preview.mediaType};base64,${preview.dataBase64}`;
+}
+
+/**
+ * Inline thumbnail for a generated image file card. The Host reads the bytes and returns
+ * base64 over RPC (the same path the markdown image uses), so the thumbnail renders on
+ * desktop and on the phone/LAN web client without host file-URL access. Clicking opens the
+ * full-size viewer.
+ */
+function AssistantPreviewCardImageThumbnail({
+  path,
+  title,
+  workspacePath,
+  workspaceIdentity,
+  workspaceRemoteSessionId,
+}: {
+  path: string;
+  title: string;
+  workspacePath?: string;
+  workspaceIdentity?: string;
+  workspaceRemoteSessionId?: string;
+}) {
+  const { fileService } = useWorkspaceServices(
+    workspacePath,
+    workspaceRemoteSessionId,
+    workspaceIdentity,
+  );
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    setDataUrl(null);
+    setFailed(false);
+    let disposed = false;
+    // 显式订阅 fileService：远端/本地 host 切换后重新读取，避免复用旧 host 的字节。
+    fileService
+      .readMediaPreview({ path })
+      .then((preview) => {
+        if (!disposed) setDataUrl(formatImagePreviewDataUrl(preview));
+      })
+      .catch((error) => {
+        if (disposed) return;
+        setFailed(true);
+        logger.warn("[AssistantPreviewCards] 图片预览读取失败", {
+          path,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [fileService, path]);
+
+  if (failed || !dataUrl) {
+    return <FileTextIcon className="size-6" aria-hidden="true" />;
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="size-full cursor-pointer overflow-hidden rounded-md"
+        aria-label={title}
+        data-testid="appearance-preview-card-image"
+        onClick={() => setDialogOpen(true)}
+      >
+        <img src={dataUrl} alt={title} className="size-full object-cover" />
+      </button>
+      <ImagePreviewDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        initialIndex={0}
+        items={[{ alt: title, filename: title, src: dataUrl }]}
+      />
+    </>
   );
 }

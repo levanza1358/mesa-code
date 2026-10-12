@@ -12,34 +12,13 @@ interface TaskActionMenuSeparatorProps {
   key?: string;
 }
 
-export function TaskActionMenuContent({
-  intl,
-  isPinned,
-  fileManagerLabel,
-  taskSessionFile,
-  activeSessionId,
-  taskNativeSessionLogFile,
-  disableTaskActions = false,
-  disableTaskTargetActions = false,
-  disablePinTaskAction = false,
-  disabledReason,
-  hideMobileUnsupportedActions = false,
-  Item,
-  Separator,
-  onTogglePinTask,
-  onStartRenameTask,
-  onArchiveTask,
-  onMarkTaskAsUnread,
-  onOpenInSplitPane,
-  openInSplitPaneDisabled = false,
-  onOpenTaskFeedback,
-  onOpenTaskPathInFileManager,
-  onCopyWorkspacePath,
-  onCopyTaskPath,
-  onCopyTaskLogPath,
-  onCopySessionId,
-  onViewModelTrajectory,
-}: {
+/**
+ * Shared props for the single task-action menu body. Both the desktop context
+ * menu (`TaskListItemContextMenu`, `GroupedTaskContextMenuContent`) and the
+ * phone-layout "…" dropdown (`TaskRowMoreMenu`) render this same body, so the
+ * action set and its enable/disable rules can never drift between input modes.
+ */
+export interface TaskActionMenuContentProps {
   intl: {
     formatMessage: (desc: { id: string }, values?: Record<string, string>) => string;
   };
@@ -74,7 +53,36 @@ export function TaskActionMenuContent({
   onCopyTaskLogPath: () => void;
   onCopySessionId?: () => void;
   onViewModelTrajectory?: () => void;
-}) {
+}
+
+export function TaskActionMenuContent({
+  intl,
+  isPinned,
+  fileManagerLabel,
+  taskSessionFile,
+  activeSessionId,
+  taskNativeSessionLogFile,
+  disableTaskActions = false,
+  disableTaskTargetActions = false,
+  disablePinTaskAction = false,
+  disabledReason,
+  hideMobileUnsupportedActions = false,
+  Item,
+  Separator,
+  onTogglePinTask,
+  onStartRenameTask,
+  onArchiveTask,
+  onMarkTaskAsUnread,
+  onOpenInSplitPane,
+  openInSplitPaneDisabled = false,
+  onOpenTaskFeedback,
+  onOpenTaskPathInFileManager,
+  onCopyWorkspacePath,
+  onCopyTaskPath,
+  onCopyTaskLogPath,
+  onCopySessionId,
+  onViewModelTrajectory,
+}: TaskActionMenuContentProps) {
   const taskTargetActionsDisabled = disableTaskActions || disableTaskTargetActions;
 
   return (

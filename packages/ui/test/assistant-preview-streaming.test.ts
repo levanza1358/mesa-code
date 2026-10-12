@@ -4,21 +4,26 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AssistantTextRow } from "@mesa-code/shared/mesa-code-protocol-v4";
 import { useAssistantPreviewCardsForAssistantTextRow } from "../src/v4/useAssistantPreviewCardsForRow.js";
+import type { AssistantPreviewCard } from "../src/lib/assistantPreviewCards.js";
 
-function previewCount(row: AssistantTextRow, latest = row): number {
-  let count = -1;
+function previewCards(row: AssistantTextRow, latest = row): AssistantPreviewCard[] {
+  let cards: AssistantPreviewCard[] = [];
   function Probe() {
-    count = useAssistantPreviewCardsForAssistantTextRow({
+    cards = useAssistantPreviewCardsForAssistantTextRow({
       row,
       latestAssistantTextRow: latest,
       assistantTextRows: [row],
       workspacePath: "synthetic-workspace",
       fileChangesTarget: null,
-    }).length;
+    });
     return null;
   }
   renderToStaticMarkup(createElement(Probe));
-  return count;
+  return cards;
+}
+
+function previewCount(row: AssistantTextRow, latest = row): number {
+  return previewCards(row, latest).length;
 }
 
 test("ineligible streaming or historical preview rows never read response text", () => {
@@ -61,4 +66,18 @@ test("complete and interrupted latest responses still produce preview cards", ()
     assert.equal(previewCount(row), 1);
     assert.equal(reads, 1);
   }
+});
+
+test("a generated image path becomes an image preview card", () => {
+  const row = {
+    kind: "assistantText",
+    rowId: 1,
+    turnId: "synthetic",
+    state: "complete",
+    text: "Here is the chart I generated: `out/chart.png` — take a look.",
+  } as AssistantTextRow;
+  const cards = previewCards(row);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.type, "file");
+  assert.equal(cards[0]?.type === "file" ? cards[0].kind : null, "image");
 });

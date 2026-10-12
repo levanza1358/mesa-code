@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Mesa Code Answer</title>
+    <style>
+      :root {
+        --ui-font-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 8px;
+        background: transparent;
+        font-family: system-ui, sans-serif;
+        font-size: var(--ui-font-size);
+      }
+      section {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 16px);
+        background: var(--color-popover);
+        color: var(--color-foreground);
+        border: 1px solid var(--color-border);
+        border-radius: 20px;
+        padding: 14px 16px;
+        box-shadow: 0 4px 12px #0003;
+      }
+      #questions {
+        overflow-y: auto;
+        min-height: 0;
+      }
+      h2,
+      p {
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: calc(var(--ui-font-size) * 0.93);
+        font-weight: 600;
+      }
+      p {
+        font-size: calc(var(--ui-font-size) * 0.93);
+      }
+      fieldset {
+        margin: 0 0 10px;
+        padding: 0;
+        border: 0;
+      }
+      legend {
+        padding: 0 0 6px;
+        font-weight: 600;
+      }
+      ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      label:hover {
+        background: color-mix(in srgb, var(--color-foreground) 6%, transparent);
+      }
+      input {
+        accent-color: var(--color-brand);
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        padding-top: 10px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button[data-primary] {
+        border-color: var(--color-brand);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 2px;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      #error:empty {
+        display: none;
+      }
+      #error {
+        color: var(--color-destructive, #f87171);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none;
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section aria-live="polite" aria-label="Mesa Code">
+      <div id="questions"></div>
+      <p id="error" role="alert"></p>
+      <nav id="actions" aria-label="Answer actions"></nav>
+    </section>
+    <script type="module" src="/src/notification-pill-answers.ts"></script>
+  </body>
+</html>

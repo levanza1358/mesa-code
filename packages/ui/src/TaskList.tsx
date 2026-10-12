@@ -13,6 +13,7 @@ import { useTabStore } from "@/store/TabStoreProvider.js";
 import { MemoTaskItem, TaskListItemContextMenuContent } from "@/TaskListItem.js";
 import { TaskListLoadingHint } from "@/TaskListLoadingHint.js";
 import { TaskRenameDialog } from "@/TaskRenameDialog.js";
+import { useIsTouchInput } from "@/hooks/useIsTouchInput.js";
 
 import { compareMesaCodeTaskListItems } from "@/lib/taskListOrdering.js";
 import { logger } from "@/logger.js";
@@ -352,6 +353,7 @@ export const TaskList = memo(function TaskList({
     [contextMenuTaskId, taskLookup],
   );
 
+  const isTouchInput = useIsTouchInput();
   function renderTaskItem(task: (typeof visibleSourceTasks)[number]) {
     const isPinned = pinnedTaskIdSet.has(task.taskId);
     return (
@@ -375,6 +377,7 @@ export const TaskList = memo(function TaskList({
         actionsDisabled={Boolean(readOnlyReason)}
         actionsDisabledReason={readOnlyReason}
         intl={intl}
+        showMoreMenu={isTouchInput}
       />
     );
   }

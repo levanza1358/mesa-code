@@ -281,6 +281,8 @@ export const TID_TASK_ITEM = "task-item";
 export const TID_TASK_EMPTY = "task-empty";
 /** 任务归档按钮（动态后缀为 taskId） */
 export const TID_TASK_ARCHIVE = "task-archive";
+/** 触屏任务行的「…」操作菜单按钮（动态后缀为 taskId）。桌面右键菜单在触屏不可达，用它顶替。 */
+export const TID_TASK_ROW_MORE_BUTTON = "task-row-more-button";
 /** 任务列表下方设置入口按钮 */
 export const TID_TASK_SETTINGS_BUTTON = "task-settings-button";
 
@@ -458,6 +460,12 @@ export const TID_CHAT_REASONING_CONTENT = "chat-reasoning-content";
 // Workspace
 /** 主内容区 header */
 export const TID_WORKSPACE_HEADER = "workspace-header";
+/** Web 手机布局：header 左上角打开侧栏抽屉的按钮 */
+export const TID_MOBILE_SIDEBAR_TOGGLE = "mobile-sidebar-toggle";
+/** Web 手机布局：侧栏抽屉打开时覆盖内容区、点击关闭抽屉的遮罩层 */
+export const TID_MOBILE_SIDEBAR_SCRIM = "mobile-sidebar-scrim";
+/** Web 手机布局：Settings 从某个分区内容返回分区列表的按钮 */
+export const TID_SETTINGS_MOBILE_BACK_TO_LIST = "settings-mobile-back-to-list";
 /** 工作区标题 */
 export const TID_WORKSPACE_TITLE = "workspace-title";
 /** 工作区路径 */

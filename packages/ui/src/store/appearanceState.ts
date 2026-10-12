@@ -14,6 +14,12 @@ import {
   UI_FONT_SIZE_STORAGE_KEY,
 } from "@/lib/uiFontSize.js";
 import {
+  applyLiquidTransparency,
+  loadLiquidTransparency,
+  normalizeLiquidTransparency,
+  writeLiquidTransparency,
+} from "@/lib/liquidTransparency.js";
+import {
   applyAccent,
   normalizeAccent,
   readStoredAccent,
@@ -56,6 +62,14 @@ export interface AppearanceState {
   uiFontSizePx: number;
   setUiFontSizePx: (fontSizePx: number) => void;
 
+  /**
+   * Liquid theme glass transparency, 0 (opaque) to 100 (fully see-through). Inert
+   * unless the Liquid theme is active; it feeds the `--liquid-opacity` root variable that
+   * the `.theme-liquid` tokens mix against.
+   */
+  liquidTransparency: number;
+  setLiquidTransparency: (transparency: number) => void;
+
   /** Layout density — comfortable (default) or compact. */
   density: Density;
   setDensity: (density: Density) => void;
@@ -67,6 +81,7 @@ export const APPEARANCE_BROADCAST_FIELDS = [
   "accent",
   "locale",
   "uiFontSizePx",
+  "liquidTransparency",
   "density",
 ] as const;
 
@@ -122,6 +137,13 @@ export function createAppearanceSlice(context: AppearanceSliceContext): Appearan
       const normalizedFontSizePx = normalizeUiFontSizePx(fontSizePx);
       writeSafeLocalStorage(UI_FONT_SIZE_STORAGE_KEY, String(normalizedFontSizePx));
       applyUiFontSizePx(normalizedFontSizePx);
+    },
+
+    liquidTransparency: loadLiquidTransparency(),
+    setLiquidTransparency: (transparency: number) => {
+      const normalized = normalizeLiquidTransparency(transparency);
+      writeLiquidTransparency(normalized);
+      applyLiquidTransparency(normalized);
     },
 
     density: readStoredDensity(),

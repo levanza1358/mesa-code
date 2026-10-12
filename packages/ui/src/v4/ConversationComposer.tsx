@@ -2202,6 +2202,10 @@ function ConversationComposerImpl({
     <div
       data-testid={TID_V4_COMPOSER}
       data-input-routing={mode}
+      // Signals that a response is running. The Quiet Studio stylesheet uses this
+      // to draw the travelling border glow, and it keeps the animation purely
+      // CSS-driven instead of adding render-time state to the composer.
+      data-composer-running={canStop ? "true" : undefined}
       aria-hidden={isBlockedByInteraction ? true : undefined}
       style={isBlockedByInteraction ? { display: "none" } : undefined}
       className={cn(

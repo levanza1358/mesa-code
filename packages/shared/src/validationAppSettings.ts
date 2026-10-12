@@ -463,6 +463,12 @@ const appSettingsObjectSchema = z.object({
   nativeSearchEnhancementsEnabled: z.boolean().default(true),
   onboardingOccupation: appSettingsOccupationSchema.nullish(),
   memoryEnabled: z.boolean().default(false),
+  // Local network access (LAN/Tailscale). Default off; host 0.0.0.0 binds all
+  // interfaces (LAN + Tailscale); port 0 lets the OS pick an ephemeral port
+  // until the user sets one. See docs/specs/local-network-access.md.
+  networkAccessEnabled: z.boolean().default(false),
+  networkAccessHost: z.string().trim().min(1).default("0.0.0.0"),
+  networkAccessPort: z.number().int().min(0).max(65535).default(0),
   lastWorkspaceSession: z.array(appWorkspaceSessionEntrySchema).default([]),
   lastActiveTabIndex: z.number().int().nonnegative().default(0),
   lastActiveTaskByWorkspace: z.record(z.string(), z.string()).optional(),
@@ -549,6 +555,9 @@ export const appSettingsPatchSchema = z.object({
     ])
     .nullish(),
   memoryEnabled: z.boolean().optional(),
+  networkAccessEnabled: z.boolean().optional(),
+  networkAccessHost: z.string().trim().min(1).optional(),
+  networkAccessPort: z.number().int().min(0).max(65535).optional(),
   lastWorkspaceSession: z.array(appWorkspaceSessionEntrySchema).optional(),
   lastActiveTabIndex: z.number().int().nonnegative().optional(),
   lastActiveTaskByWorkspace: z.record(z.string(), z.string()).optional(),

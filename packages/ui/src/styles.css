@@ -1253,6 +1253,158 @@ body {
 }
 
 /*
+ * Liquid: the liquid-glass dark theme.
+ *
+ * Background-family tokens are deliberately translucent so the native window material —
+ * macOS `vibrancy: "under-window"` and Windows `backgroundMaterial: "acrylic"`, both
+ * already enabled in desktopWindowChrome.ts over a transparent BrowserWindow — reads
+ * through the renderer as glass. Foreground, semantic-status, diff, and git tokens stay
+ * opaque; borders stay near-opaque so panes keep a readable edge.
+ *
+ * The glass strength is the single variable `--liquid-opacity` (colour amount, the
+ * inverse of the Appearance "Transparency" slider), written on the document root by
+ * `applyLiquidTransparency` (lib/liquidTransparency.ts). Every surface token mixes a
+ * colour with `var(--liquid-opacity)`; per-surface offsets keep text-bearing layers
+ * (cards, inputs, popovers) a little more opaque than the shell so contrast holds at any
+ * slider value. `min(90%, ...)` keeps overlays from ever becoming fully opaque, and
+ * `quiet-studio.css` adds renderer-side frost on genuinely stacked surfaces and a
+ * colorful ambient backdrop for web (which has no window material).
+ */
+.theme-liquid {
+  --mesa-code-glass-blur: 44px;
+  --mesa-code-glass-saturate: 2;
+  --animated-gradient-text-strong: rgba(255, 255, 255, 1);
+  --animated-gradient-text-soft: rgba(255, 255, 255, 0.22);
+  --color-background: color-mix(in oklab, #0a0e13 var(--liquid-opacity, 45%), transparent);
+  --color-background-win-alt: color-mix(in oklab, #16202a var(--liquid-opacity, 45%), transparent);
+  --color-background-alt: color-mix(
+    in oklab,
+    #16202a min(100%, calc(var(--liquid-opacity, 45%) * 1.2)),
+    transparent
+  );
+  --color-brand: #82e4b7;
+  --color-accent: color-mix(in srgb, var(--color-brand) 12%, var(--color-sidebar));
+  --color-border: color-mix(in oklab, #b6c8d3 min(90%, calc(var(--liquid-opacity, 45%) + 14%)), transparent);
+  --color-border-hover: color-mix(
+    in oklab,
+    #cbd9e2 min(90%, calc(var(--liquid-opacity, 45%) + 22%)),
+    transparent
+  );
+  --color-hover: rgba(233, 240, 245, 0.08);
+  --color-selected: rgba(233, 240, 245, 0.12);
+  --color-header: color-mix(in oklab, #10171e var(--liquid-opacity, 45%), transparent);
+  --color-panel: color-mix(in oklab, #10171e var(--liquid-opacity, 45%), transparent);
+  --color-sidebar: color-mix(in oklab, #10171e var(--liquid-opacity, 45%), transparent);
+  --color-surface: color-mix(
+    in oklab,
+    #1b242d min(100%, calc(var(--liquid-opacity, 45%) + 8%)),
+    transparent
+  );
+  --color-surface-hover: color-mix(
+    in oklab,
+    #28333d min(100%, calc(var(--liquid-opacity, 45%) + 16%)),
+    transparent
+  );
+  --color-card: color-mix(
+    in oklab,
+    #18212a min(100%, calc(var(--liquid-opacity, 45%) + 10%)),
+    transparent
+  );
+  --color-card-selected: var(--color-input);
+  --color-card-border: var(--color-border);
+  --color-popover: color-mix(
+    in oklab,
+    #121a22 min(90%, calc(var(--liquid-opacity, 45%) + 28%)),
+    transparent
+  );
+  --color-popover-foreground: var(--color-foreground);
+  --color-popover-header: color-mix(
+    in oklab,
+    #0f161d min(90%, calc(var(--liquid-opacity, 45%) + 26%)),
+    transparent
+  );
+  --color-popover-border: var(--color-border);
+  --color-input: color-mix(
+    in oklab,
+    #0a0e13 min(100%, calc(var(--liquid-opacity, 45%) + 6%)),
+    transparent
+  );
+  --color-input-focused: var(--color-input);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+  --color-input-border-focused: var(--color-border-hover);
+  --color-terminal-bg: color-mix(
+    in oklab,
+    #0a0e11 min(100%, calc(var(--liquid-opacity, 45%) + 30%)),
+    transparent
+  );
+  --color-terminal-fg: #eaf1f5;
+  --color-terminal-cursor: #eaf1f5;
+  --color-terminal-cursor-accent: #0a0e13;
+  --color-terminal-selection: rgba(130, 228, 183, 0.28);
+  --color-terminal-selection-inactive: rgba(255, 255, 255, 0.1);
+  --color-terminal-black: #33414c;
+  --color-tab: color-mix(in oklab, #10171e var(--liquid-opacity, 45%), transparent);
+  --color-tab-active: color-mix(in oklab, #0a0e13 var(--liquid-opacity, 45%), transparent);
+  --color-tab-border: var(--color-border);
+  --color-menu: color-mix(
+    in oklab,
+    #121a22 min(90%, calc(var(--liquid-opacity, 45%) + 28%)),
+    transparent
+  );
+  --color-menu-hover: color-mix(
+    in oklab,
+    #1b242d min(90%, calc(var(--liquid-opacity, 45%) + 24%)),
+    transparent
+  );
+  --color-primary: #ffffff;
+  --color-primary-foreground: #0a0e13;
+  --color-secondary: color-mix(
+    in oklab,
+    #1b242d min(100%, calc(var(--liquid-opacity, 45%) + 8%)),
+    transparent
+  );
+  --color-foreground: #eaf1f5;
+  --color-foreground-subtle: #aebcc6;
+  --color-foreground-subtlest: color-mix(in oklab, #aebcc6 50%, transparent);
+  --color-foreground-inverse: #0a0e13;
+  --color-success: #9de7b4;
+  --color-success-foreground: #0a0e13;
+  --color-destructive: #ffb2ab;
+  --color-destructive-foreground: #ffffff;
+  --color-warning: #f5d48d;
+  --color-warning-foreground: #0a0e13;
+  --color-diff-added: #193d2b;
+  --color-diff-added-foreground: #eaf1f5;
+  --color-diff-removed: #482b2d;
+  --color-diff-removed-foreground: #eaf1f5;
+  --color-toast: color-mix(
+    in oklab,
+    #18212a min(92%, calc(var(--liquid-opacity, 45%) + 32%)),
+    transparent
+  );
+  --color-tooltip: color-mix(
+    in oklab,
+    #18212a min(92%, calc(var(--liquid-opacity, 45%) + 32%)),
+    transparent
+  );
+  --color-tooltip-foreground: #eaf1f5;
+  --color-tooltip-tag: color-mix(
+    in oklab,
+    #33414c min(90%, calc(var(--liquid-opacity, 45%) + 18%)),
+    transparent
+  );
+  --color-tooltip-tag-foreground: #aebcc6;
+  --color-tag: #33414c;
+  --color-idle-task: #7b5ce5;
+  --color-idle-task-surface: color-mix(
+    in oklab,
+    #1a1040 min(90%, calc(var(--liquid-opacity, 45%) + 14%)),
+    transparent
+  );
+}
+
+/*
  * Previously only the task list customized its scrollbar; other panels, dropdown lists, and code areas kept the system default,
  * so thickness, corner radius, and track background were inconsistent within one interface. Here this transparent track + rounded thumb
  * is promoted to a global native scrollbar style so desktop/web and light/dark themes look consistent.

@@ -18,6 +18,7 @@ import type {
 import {
   BUILTIN_MODEL_PROVIDER_IDS,
   TID_SETTINGS_BACK_BUTTON,
+  TID_SETTINGS_MOBILE_BACK_TO_LIST,
   TID_SETTINGS_PAGE,
   TID_SETTINGS_SECTION_NAV,
   TID_SETTINGS_USAGE_TAB,
@@ -28,6 +29,7 @@ import { toast } from "@/components/ui/toast.js";
 import { DesktopWindowFrame } from "@/DesktopWindowFrame.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
+import { useIsMobileWeb } from "@/hooks/useIsMobileWeb.js";
 import { getPathLeaf } from "@/lib/path.js";
 import { useProviderSettingsView } from "@/hooks/useProviderSettingsView.js";
 import { useUsageEntitlement } from "@/hooks/useUsageEntitlement.js";
@@ -63,6 +65,9 @@ import { SubagentsSection } from "@/settings/SubagentsSection.js";
 import { AutomationsSection } from "@/settings/AutomationsSection.js";
 import { PluginsSection } from "@/settings/PluginsSection.js";
 import { HooksSection } from "@/settings/HooksSection.js";
+import { NetworkSection } from "@/settings/NetworkSection.js";
+import { NotificationsSection } from "@/settings/NotificationsSection.js";
+import { SoundSection } from "@/settings/SoundSection.js";
 import { WorkspaceFileSearchSection } from "@/settings/WorkspaceFileSearchSection.js";
 import { MemorySettingsSection } from "@/settings/MemorySettingsSection.js";
 import { SoulSection } from "@/settings/SoulSection.js";
@@ -244,7 +249,6 @@ function SettingsSidebarButton({
         aria-label={label}
         className={cn(
           "flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left transition-colors",
-          "max-lg:mx-auto max-lg:size-10 max-lg:justify-center max-lg:px-0",
           active
             ? "quiet-studio-nav-selected text-brand"
             : "text-foreground-subtle hover:bg-surface-hover hover:text-foreground",
@@ -254,7 +258,7 @@ function SettingsSidebarButton({
         <span className="flex size-4 shrink-0 items-center justify-center text-current">
           <Icon className="size-4 text-foreground" />
         </span>
-        <span className="min-w-0 flex-1 max-lg:sr-only">
+        <span className="min-w-0 flex-1">
           {children ?? <span className="truncate text-ui-base text-foreground">{label}</span>}
         </span>
       </button>
@@ -342,12 +346,10 @@ export function SettingsPage({
   const setCodePreviewSettings = useMesaCodeStore((state) => state.setCodePreviewSettings);
   const uiFontSizePx = useMesaCodeStore((state) => state.uiFontSizePx);
   const setUiFontSizePx = useMesaCodeStore((state) => state.setUiFontSizePx);
-  const notificationEnabled = useMesaCodeStore((state) => state.notificationEnabled);
-  const setNotificationEnabled = useMesaCodeStore((state) => state.setNotificationEnabled);
-  const notificationSoundEnabled = useMesaCodeStore((state) => state.notificationSoundEnabled);
-  const setNotificationSoundEnabled = useMesaCodeStore(
-    (state) => state.setNotificationSoundEnabled,
-  );
+  const liquidTransparency = useMesaCodeStore((state) => state.liquidTransparency);
+  const setLiquidTransparency = useMesaCodeStore((state) => state.setLiquidTransparency);
+  const notificationPreferences = useMesaCodeStore((state) => state.notificationPreferences);
+  const setNotificationPreferences = useMesaCodeStore((state) => state.setNotificationPreferences);
   const usageProviderSettingsRead = useProviderSettingsView();
   const usageProviderSettingsView =
     usageProviderSettingsRead.state.status === "ready"
@@ -597,6 +599,20 @@ export function SettingsPage({
       writeLastSettingsSectionPreference(resolvedSection);
     },
     [activeSection],
+  );
+  // Web phone layout: the two settings columns become master (nav) → detail
+  // (content). `activeMobileSection === null` shows the section list; picking one
+  // shows its content with a back affordance. This is local, unpersisted UI state
+  // so it never re-enters the workspace store; desktop leaves it at its initial
+  // value and never branches on it.
+  const isMobileWeb = useIsMobileWeb(isDesktop);
+  const [activeMobileSection, setActiveMobileSection] = useState<SettingsSectionId | null>(null);
+  const handleSelectMobileSection = useCallback(
+    (section: SettingsSectionId, fallbackSection?: SettingsSectionId) => {
+      setActiveMobileSection(fallbackSection ?? section);
+      setActiveSettingsSection(section, fallbackSection);
+    },
+    [setActiveSettingsSection],
   );
   const handleOpenCodingPlanUpgradeSettings = useCallback(
     (
@@ -1375,7 +1391,12 @@ export function SettingsPage({
           data-active-section={activeSection}
           // 隐式 auto 行会按 Memory viewer 的内容高度撑出窗口，随后被 DesktopWindowFrame 裁切且没有滚动条。
           // 固定为单个 minmax(0, 1fr) 行，让普通设置页和内部滚动 viewer 都以窗口剩余高度为边界。
-          className="relative grid h-screen min-h-full w-full grid-cols-[var(--workspace-sidebar-width)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]"
+          //
+          // 不再用 `--workspace-sidebar-width` 预留首列。设置页激活时 workspace 外壳仍挂载但已透明
+          // （见 RootWorkspaceContent），预留列不会渲染任何东西，只会变成一条空白带，把设置导航
+          // 推到窗口中间（导航落在第 2 列），看起来像两个互不相连的窄栏。
+          // 设置页自己拥有两列：导航列跟随同一个宽度变量作为可读的固定宽度，内容列占满剩余空间。
+          className="relative grid h-screen min-h-full w-full grid-cols-[264px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] max-md:grid-cols-1"
         >
           {isWindowsDesktop ? <WindowsTopLeftLogo showName /> : null}
 
@@ -1406,9 +1427,18 @@ export function SettingsPage({
               </div>
             </div>
           ) : null}
-          <aside className="quiet-studio-sidebar min-w-0 overflow-hidden border-r border-border bg-sidebar">
+          <aside
+            className={cn(
+              "quiet-studio-sidebar min-w-0 overflow-hidden border-r border-border bg-sidebar",
+              // Web phone layout: the nav column fills the screen as the master
+              // list; the content column is the detail. Exactly one is visible,
+              // chosen by activeMobileSection. Gated by isMobileWeb so desktop is
+              // never hidden.
+              isMobileWeb && activeMobileSection !== null && "hidden",
+            )}
+          >
             <div className="flex h-full flex-col">
-              <div className="h-12 [app-region:drag]"></div>
+              <div className="h-12 [app-region:drag] max-md:hidden"></div>
               <div className={cn("px-2", isWindowsDesktop ? "py-1.5" : "py-2")}>
                 {onBack ? (
                   <ControlHintTooltip
@@ -1458,7 +1488,7 @@ export function SettingsPage({
                 className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
               >
                 <div className="space-y-4">
-                  {settingsSectionGroups.map((group, groupIndex) => {
+                  {settingsSectionGroups.map((group) => {
                     const groupLabel = intl.formatMessage({
                       id: group.titleId,
                     });
@@ -1469,14 +1499,11 @@ export function SettingsPage({
                         key={group.id}
                         role="group"
                         aria-labelledby={groupLabelId}
-                        className={cn(
-                          "space-y-1",
-                          groupIndex > 0 && "max-lg:border-t max-lg:border-border max-lg:pt-3",
-                        )}
+                        className="space-y-1"
                       >
                         <div
                           id={groupLabelId}
-                          className="px-2.5 pb-1 text-ui-sm font-medium text-foreground-subtlest max-lg:sr-only"
+                          className="px-2.5 pb-1 text-ui-sm font-medium text-foreground-subtlest"
                         >
                           {groupLabel}
                         </div>
@@ -1501,7 +1528,7 @@ export function SettingsPage({
                                   },
                                   operation: () => {
                                     setSettingsSectionNavigationVersion((version) => version + 1);
-                                    setActiveSettingsSection(id);
+                                    handleSelectMobileSection(id);
                                   },
                                   completed: { resultSource: "local_commit", sectionId: id },
                                   failureStage: "navigation_commit",
@@ -1517,7 +1544,7 @@ export function SettingsPage({
                   })}
                 </div>
               </nav>
-              <div className="shrink-0 max-lg:hidden">
+              <div className="shrink-0">
                 <WorkspaceSidebarFooter
                   className="border-t border-border px-2 py-2"
                   onSettingsButtonClick={onBack}
@@ -1534,8 +1561,30 @@ export function SettingsPage({
               // 桌面平台统一复用主工作区的面板 inset；左侧仍与导航相接，顶部由独立拖拽留白承接。
               // The desktop wrapper's padding leaves a visible gutter after Windows frame removal.
               isDesktop && !isWindowsDesktop ? "p-1 pl-0 pt-0" : "p-0",
+              // Web phone layout master-detail: the detail column only shows once a
+              // section is picked; otherwise the nav column owns the screen.
+              isMobileWeb && activeMobileSection === null && "hidden",
             )}
           >
+            {/* Web phone layout master-detail: returns from a section's content to
+                the section list. Desktop never renders it (`isMobileWeb` is false). */}
+            {isMobileWeb ? (
+              <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 md:hidden">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-testid={TID_SETTINGS_MOBILE_BACK_TO_LIST}
+                  className="h-9 gap-2 rounded-lg px-2.5 text-foreground hover:bg-surface-hover hover:text-foreground"
+                  onClick={() => setActiveMobileSection(null)}
+                >
+                  <ArrowLeft className="size-4" />
+                  <span className="truncate">
+                    {intl.formatMessage({ id: "settings.mobileBackToList" })}
+                  </span>
+                </Button>
+              </div>
+            ) : null}
             <div
               data-settings-top-inset={isDesktop && !isWindowsDesktop ? "true" : undefined}
               className={cn(
@@ -1585,8 +1634,7 @@ export function SettingsPage({
                 <div className="flex min-h-0 flex-1 flex-col">
                   <div className="flex h-12 shrink-0">
                     <div
-                      // Settings 窄布局会像左侧导航一样在 max-lg 收成 icon rail。
-                      // 此时外层已经提供 max-lg:h-16 的顶部拖拽/避让区，内层 h-10 再保留会把内容额外压低。
+                      // Settings 头部是 48px（h-12）拖拽/面包屑行；macOS 窄宽度时外层另提供 max-lg:h-16 的顶部拖拽/避让区。
                       // Electron 的 drag 区不能和右上角帮助/窗口按钮命中区域重叠；
                       // 这里把右侧按钮区域从拖拽条里让出来，避免真实鼠标点击被标题栏拖拽吞掉。
                       // Linux 避开右上角内联窗控组；Windows 避开 OS 原生窗控加帮助按钮。
@@ -1649,8 +1697,6 @@ export function SettingsPage({
                             <GeneralSectionContent
                               isDesktop={isDesktop}
                               platform={platform}
-                              notificationEnabled={notificationEnabled}
-                              notificationSoundEnabled={notificationSoundEnabled}
                               desktopTrayEnabled={desktopTrayEnabled}
                               closeToTrayOnWindows={closeToTrayOnWindows}
                               minimizeToTrayOnDesktop={minimizeToTrayOnDesktop}
@@ -1671,36 +1717,6 @@ export function SettingsPage({
                               httpProxyCaCertPath={httpProxyCaCertPath}
                               defaultHomeDir={defaultHomeDir}
                               showIntegratedTerminalShell={hostPlatform === "win32"}
-                              setNotificationEnabled={(enabled) =>
-                                runUserAction({
-                                  input: {
-                                    featureId: "settings.notification",
-                                    action: "toggle_notification",
-                                    trigger: "switch",
-                                  },
-                                  operation: () => setNotificationEnabled(enabled),
-                                  completed: {
-                                    resultSource: "local_commit",
-                                    stateAfter: enabled ? "enabled" : "disabled",
-                                  },
-                                  failureStage: "local_commit",
-                                })
-                              }
-                              setNotificationSoundEnabled={(enabled) =>
-                                runUserAction({
-                                  input: {
-                                    featureId: "settings.notification",
-                                    action: "toggle_notification_sound",
-                                    trigger: "switch",
-                                  },
-                                  operation: () => setNotificationSoundEnabled(enabled),
-                                  completed: {
-                                    resultSource: "local_commit",
-                                    stateAfter: enabled ? "enabled" : "disabled",
-                                  },
-                                  failureStage: "local_commit",
-                                })
-                              }
                               taskAutoArchiveEnabled={taskAutoArchiveEnabled}
                               taskAutoArchiveOlderThanDays={taskAutoArchiveOlderThanDays}
                               messageStreamShowReasoning={messageStreamShowReasoning}
@@ -1822,6 +1838,22 @@ export function SettingsPage({
                                 failureStage: "local_commit",
                               })
                             }
+                            liquidTransparency={liquidTransparency}
+                            setLiquidTransparency={(transparency) =>
+                              runUserAction({
+                                input: {
+                                  featureId: "settings.appearance",
+                                  action: "change_liquid_transparency",
+                                  trigger: "keyboard",
+                                },
+                                operation: () => setLiquidTransparency(transparency),
+                                completed: {
+                                  resultSource: "local_commit",
+                                  valueAfter: String(transparency),
+                                },
+                                failureStage: "local_commit",
+                              })
+                            }
                           />
                         ) : activeSection === "shortcuts" ? (
                           <ShortcutSettingsSection isDesktop={Boolean(isDesktop)} />
@@ -1891,6 +1923,52 @@ export function SettingsPage({
                           <HooksSection
                             workspacePath={activeWorkspacePath}
                             workspaceIdentity={activeWorkspaceIdentity}
+                          />
+                        ) : activeSection === "network" ? (
+                          // Desktop-only; the nav entry is filtered out on web, so
+                          // this branch only matters on desktop where the service
+                          // is present.
+                          localHostServices.networkAccessService ? (
+                            <NetworkSection service={localHostServices.networkAccessService} />
+                          ) : null
+                        ) : activeSection === "notifications" ? (
+                          <NotificationsSection
+                            preferences={notificationPreferences}
+                            onChange={(patch) =>
+                              runUserAction({
+                                input: {
+                                  featureId: "settings.notification",
+                                  action: "update_notification_preferences",
+                                  trigger: "select",
+                                },
+                                operation: () => setNotificationPreferences(patch),
+                                // `stateAfter` is only meaningful for an on/off toggle; any other
+                                // control (position, duration, an event sub-toggle) has no such
+                                // state, so it is omitted rather than coerced.
+                                ...(patch.enabled === undefined
+                                  ? {}
+                                  : { completed: {
+                                      resultSource: "local_commit" as const,
+                                      stateAfter: patch.enabled ? ("enabled" as const) : ("disabled" as const),
+                                    } }),
+                                failureStage: "local_commit",
+                              })
+                            }
+                          />
+                        ) : activeSection === "sound" ? (
+                          <SoundSection
+                            preferences={notificationPreferences}
+                            onChange={(patch) =>
+                              runUserAction({
+                                input: {
+                                  featureId: "settings.notification",
+                                  action: "update_notification_preferences",
+                                  trigger: "select",
+                                },
+                                operation: () => setNotificationPreferences(patch),
+                                failureStage: "local_commit",
+                              })
+                            }
                           />
                         ) : null}
                       </div>

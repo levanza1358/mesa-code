@@ -6,7 +6,7 @@
 import {
   AgentErrorCode,
   CoreErrorType,
-  DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS,
+  DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS,
   SessionEventType,
   createChildTraceContext,
   createCoreError,
@@ -211,7 +211,11 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
         logger: options.logger,
         request,
         signal: taskAbort.signal,
-        timeoutMs: options.inactivityTimeoutMs ?? DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS,
+        // Independent bound, far below the model-stream idle timeout, so the watchdog fires
+        // first on a silent child. Falling back to the stream-idle constant (as before) armed
+        // the watchdog and the stream-idle timeout at the same instant, so neither ever
+        // interrupted a child that simply stopped producing events.
+        timeoutMs: options.inactivityTimeoutMs ?? DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS,
       });
       const readyGate = createSubagentSessionReadyGate();
       // child persistence/resume 可能在 onSessionReady 前永久挂起；watchdog 和
@@ -504,6 +508,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
           onSessionStartFailed: readyGate.reject,
         },
         taskAbort.dispose,
+        taskAbort.abort,
       );
       try {
         await readyGate.promise;
@@ -1044,6 +1049,7 @@ async function resumeTerminalAgentInBackground(
       onSessionStartFailed: readyGate.reject,
     },
     taskAbort.dispose,
+    taskAbort.abort,
   );
   try {
     await readyGate.promise;
@@ -1332,27 +1338,50 @@ async function runBackgroundAgent(
   runOptions?: SubagentRunOptions,
   executionOptions: SubagentExecutionOptions = {},
   onSettled?: () => void,
+  abortChild?: (reason?: unknown) => void,
 ): Promise<void> {
   let sessionReady = false;
+  // Background children are not awaited by a parent turn, so nothing else bounds their silence:
+  // without a watchdog a stalled child stays `running` forever (the task record and every
+  // waiting indicator never settle). Reuse the same bounded inactivity watchdog as the
+  // foreground path so a silent background child fails instead of hanging indefinitely.
+  const backgroundSignal = runOptions?.signal ?? new AbortController().signal;
+  const activityWatchdog = createSubagentActivityWatchdog({
+    abort: abortChild ?? (() => {}),
+    lifecycle,
+    logger: options.logger,
+    request,
+    signal: backgroundSignal,
+    timeoutMs: options.inactivityTimeoutMs ?? DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS,
+  });
+  activityWatchdog.start();
   try {
     if (isTerminalRuntimeTask(registry.get(lifecycle.agentId) ?? { status: "lost" })) {
       return;
     }
-    const completed = await runAgentToCompletion(
-      options,
+    // Like the foreground path: a child runtime or model adapter may never settle after abort,
+    // so the watchdog abort must be able to settle this promise on its own.
+    const completionPromise = guardSubagentPromiseWithAbort(
+      runAgentToCompletion(
+        options,
+        request,
+        lifecycle,
+        registry,
+        runOptions,
+        { reportActivity: activityWatchdog.reportActivity },
+        {
+          ...executionOptions,
+          onSessionReady: async () => {
+            await executionOptions.onSessionReady?.();
+            sessionReady = true;
+          },
+        },
+      ),
       request,
       lifecycle,
-      registry,
-      runOptions,
-      {},
-      {
-        ...executionOptions,
-        onSessionReady: async () => {
-          await executionOptions.onSessionReady?.();
-          sessionReady = true;
-        },
-      },
+      backgroundSignal,
     );
+    const completed = await completionPromise;
     await finalizeBackgroundCompletion(options, request, lifecycle, registry, completed);
   } catch (error) {
     if (!sessionReady) {
@@ -1361,6 +1390,7 @@ async function runBackgroundAgent(
     }
     await finalizeBackgroundFailure(options, request, lifecycle, registry, error);
   } finally {
+    activityWatchdog.stop();
     onSettled?.();
   }
 }

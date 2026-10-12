@@ -264,6 +264,7 @@ export function App({
   });
   const workspaceKey = workspaceIdentity?.trim() || workspaceAbsPath;
   const notificationEnabled = useMesaCodeStore((s) => s.notificationEnabled);
+  const notificationPreferences = useMesaCodeStore((s) => s.notificationPreferences);
   useWorkspaceTerminalTaskNotifications({
     workspacePath: workspaceAbsPath,
     ...(workspaceIdentity ? { workspaceIdentity } : {}),
@@ -271,6 +272,7 @@ export function App({
     enabled: notificationEnabled,
     rpcReady: workspaceRpcReady,
     platform,
+    preferences: notificationPreferences,
     formatMessage: intl.formatMessage,
   });
   // 闲时任务终态/等确认通知：仅桌面本地链路，main 进程按 status:taskId 去重多窗口重复。

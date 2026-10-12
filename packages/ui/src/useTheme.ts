@@ -12,6 +12,7 @@ export type Theme =
   | "purple"
   | "rose"
   | "amber"
+  | "liquid"
   | "system";
 export type ResolvedTheme = "light" | "dark";
 
@@ -19,7 +20,15 @@ const STORAGE_KEY = "mesa-code-theme";
 const BROWSER_THEME_SURFACE_ATTRIBUTE = "data-mesa-code-browser-theme-surface";
 
 /** All dark catalogue themes beyond zai-dark and black. */
-const CATALOGUE_DARK_THEMES = ["midnight", "ocean", "forest", "purple", "rose", "amber"] as const;
+const CATALOGUE_DARK_THEMES = [
+  "midnight",
+  "ocean",
+  "forest",
+  "purple",
+  "rose",
+  "amber",
+  "liquid",
+] as const;
 
 function getSystemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";

@@ -1,5 +1,13 @@
 <!doctype html>
-<html lang="en">
+<!--
+  data-mesa-code-web is the web-only document marker: it is present only in the
+  web client's document (the desktop renderer's index.html never sets it). CSS
+  finds it as html[data-mesa-code-web] to scope presentation rules that must never
+  reach the desktop renderer, without shipping a second copy of the desktop bundle.
+  The phone composer row (quiet-studio.css, mobile web layout spec rule 15) is the
+  first consumer.
+-->
+<html lang="en" data-mesa-code-web>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

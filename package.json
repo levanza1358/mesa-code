@@ -1,6 +1,6 @@
 {
   "name": "mesa-code",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -14,6 +14,8 @@
     "dev:server": "pnpm --filter @mesa-code/server dev",
     "prepare": "husky",
     "prepare:desktop-runtime": "pnpm --filter @mesa-code/desktop prepare:runtime-assets",
+    "tools:bootstrap": "node scripts/tools/tool-bootstrap.mjs",
+    "tools:list": "node scripts/tools/tool-bootstrap.mjs --list",
     "dep:graph": "node scripts/dependency-graph.mjs",
     "dep:refs": "node scripts/dep-refs.mjs",
     "verify:pre-push": "pnpm run lint && pnpm run architecture:check -- --changed",

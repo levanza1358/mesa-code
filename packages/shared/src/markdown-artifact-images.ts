@@ -51,7 +51,11 @@ export function decodeMarkdownArtifactImageSource(source: string): string | null
   if (!source.startsWith(ARTIFACT_IMAGE_RENDER_PREFIX)) return null;
   try {
     const ref = decodeURIComponent(source.slice(ARTIFACT_IMAGE_RENDER_PREFIX.length));
-    return ref.startsWith("mesaCode-artifact://") ? ref : null;
+    // The artifact URI scheme is hyphenated (`mesa-code-artifact://`) everywhere it is
+    // produced; the camelCase form is accepted too so a stray legacy ref still decodes.
+    return ref.startsWith("mesa-code-artifact://") || ref.startsWith("mesaCode-artifact://")
+      ? ref
+      : null;
   } catch {
     return null;
   }

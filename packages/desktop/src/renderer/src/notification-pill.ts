@@ -4,6 +4,7 @@ declare global {
   interface Window {
     notificationPill: {
       onState(callback: (state: unknown) => void): () => void;
+      onPanelState(callback: (state: unknown) => void): () => void;
       act(action: NotificationPillAction): void;
     };
   }
@@ -57,7 +58,7 @@ const unsubscribe = window.notificationPill.onState((payload) => {
       ? document.activeElement.dataset.actionKey
       : undefined;
   actions.replaceChildren();
-  const add = (label: string, action: "open" | "answer", optionId?: string) => {
+  const add = (label: string, action: "open" | "answer" | "reveal", optionId?: string) => {
     const button = document.createElement("button");
     button.textContent = label;
     button.dataset.actionKey = optionId ?? action;
@@ -75,6 +76,9 @@ const unsubscribe = window.notificationPill.onState((payload) => {
     actions.append(button);
   };
   add(state.openLabel, "open");
+  // A userInput pill stays compact: Show answer opens the taller answer panel rather than expanding
+  // answer controls inside the pill itself.
+  if (state.answerPrompt) add(state.answerPrompt.showLabel, "reveal");
   for (const option of state.options) add(option.label, "answer", option.optionId);
   checkSummary();
   if (focused) {

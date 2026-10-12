@@ -9,6 +9,7 @@ import type {
 } from "@mesa-code/shared";
 import { useState } from "react";
 import { TID_WORKSPACE_HEADER } from "@mesa-code/shared";
+import { ArrowLeftIcon, ArrowRightIcon, MessageCirclePlus } from "lucide-react";
 import type { ConversationDropTargetController } from "@/v4/composer/conversationDropTarget.js";
 import { cn } from "@/components/lib/utils.js";
 import { WINDOWS_CAPTION_BAND_RIGHT_INSET_PX } from "@/windowCaptionControls.js";
@@ -17,6 +18,9 @@ import {
   type WorkspaceHeaderState,
   WorkspaceHeaderTitleSection,
 } from "@/WorkspaceHeaderSections.js";
+import { MobileSidebarToggleButton } from "@/app-shell/MobileSidebarToggleButton.js";
+import { DesktopTopOverlayActionButton } from "@/DesktopTopOverlayActionButton.js";
+import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
 import type { WorkspaceHeaderVariant } from "@/WorkspaceHeaderSections/shared.js";
 
 export function WorkspaceHeader({
@@ -54,9 +58,11 @@ export function WorkspaceHeader({
 
   isDesktop,
   simplifyForNarrowRemote = false,
+  isMobileWeb = false,
   isSidebarVisible,
   isTerminalOpen,
   isSidePaneOpen,
+  onToggleSidebar,
   onRefreshGit,
   onToggleTerminal,
   onToggleSidePane,
@@ -64,6 +70,11 @@ export function WorkspaceHeader({
   onReloadSession,
   reloadSessionDisabled,
   reloadSessionPending,
+  onGoBack,
+  onGoForward,
+  canGoBack = false,
+  canGoForward = false,
+  onCreateTask,
 }: {
   variant?: WorkspaceHeaderVariant;
   draftDropTargetController?: ConversationDropTargetController | null;
@@ -97,6 +108,8 @@ export function WorkspaceHeader({
   useWindowsCaptionSpacing?: boolean;
   isDesktop?: boolean;
   simplifyForNarrowRemote?: boolean;
+  /** Web phone layout: render the leading navigation-drawer button. Never set on desktop. */
+  isMobileWeb?: boolean;
   isSidebarVisible: boolean;
   isTerminalOpen: boolean;
   isSidePaneOpen: boolean;
@@ -104,6 +117,8 @@ export function WorkspaceHeader({
   onToggleTerminal: () => void;
   onToggleBrowser: () => void;
   onToggleSidePane: () => void;
+  /** Web phone layout only: toggles the off-canvas navigation drawer. */
+  onToggleSidebar?: () => void;
   toggleSidePaneShortcutLabel?: string;
   onReloadSession: (options?: {
     resumeTaskId?: string | null;
@@ -114,7 +129,18 @@ export function WorkspaceHeader({
   onCreateTask: () => void;
   onOpenWorkspace: () => void;
   allowOpenWorkspace?: boolean;
+  /**
+   * Web phone layout only. When set, the header renders the task navigation
+   * (back / forward / new task) inline so they line up with the drawer and panel
+   * buttons, instead of leaving them in the floating overlay that would overlap
+   * the header. All four are ignored on desktop.
+   */
+  onGoBack?: () => void;
+  onGoForward?: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
 }) {
+  const { intl } = useMesaCodeIntl();
   const [selectedEditor, setSelectedEditor] = useState<EditorInfo | null>(null);
   const shouldOffsetHeaderForWindowControls = !isSidebarVisible;
   // 内联窗控只剩 Linux：Windows 改用 OS 原生窗控，macOS 用原生红绿灯。
@@ -134,7 +160,11 @@ export function WorkspaceHeader({
         headerWindowControlsPaddingClass = isMacFullscreen ? "pl-38" : "pl-58";
       }
     } else {
-      headerWindowControlsPaddingClass = hasUpdateReady ? "pl-44" : "pl-38";
+      // The left padding here reserves the desktop window-control area (Linux
+      // inline controls). On the web phone layout there is no window chrome and
+      // the drawer toggle is the leading control, so the reserve would push it
+      // far from the left edge with an empty gap. Drop it on that layout.
+      headerWindowControlsPaddingClass = hasUpdateReady ? "pl-44 max-md:pl-2" : "pl-38 max-md:pl-2";
     }
   }
 
@@ -166,6 +196,40 @@ export function WorkspaceHeader({
           headerWindowControlsPaddingClass,
         )}
       >
+        {isMobileWeb ? (
+          // Web phone layout: one tidy row. The drawer toggle and the task
+          // navigation (back / forward / new task) live here, inline with the
+          // panel buttons on the right, instead of in the floating overlay —
+          // which is absolutely positioned and would overlap this header.
+          <div className="flex shrink-0 items-center gap-1">
+            {onToggleSidebar ? (
+              <MobileSidebarToggleButton onToggleSidebar={onToggleSidebar} />
+            ) : null}
+            <DesktopTopOverlayActionButton
+              title={intl.formatMessage({ id: "taskNav.back" })}
+              ariaLabel={intl.formatMessage({ id: "taskNav.back" })}
+              disabled={!canGoBack}
+              onClick={() => onGoBack?.()}
+            >
+              <ArrowLeftIcon className="size-4" />
+            </DesktopTopOverlayActionButton>
+            <DesktopTopOverlayActionButton
+              title={intl.formatMessage({ id: "taskNav.forward" })}
+              ariaLabel={intl.formatMessage({ id: "taskNav.forward" })}
+              disabled={!canGoForward}
+              onClick={() => onGoForward?.()}
+            >
+              <ArrowRightIcon className="size-4" />
+            </DesktopTopOverlayActionButton>
+            <DesktopTopOverlayActionButton
+              title={intl.formatMessage({ id: "sidebar.newTask" })}
+              ariaLabel={intl.formatMessage({ id: "sidebar.newTask" })}
+              onClick={onCreateTask}
+            >
+              <MessageCirclePlus className="size-4" />
+            </DesktopTopOverlayActionButton>
+          </div>
+        ) : null}
         {variant === "task" ? (
           <WorkspaceHeaderTitleSection
             variant={variant}

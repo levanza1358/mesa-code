@@ -17,6 +17,13 @@ export interface WebSocketConnectionCloseEvent {
 
 interface WebSocketConnectionOptions {
   onClose?: (event: WebSocketConnectionCloseEvent) => void;
+  /**
+   * Fires once when the ready connection's socket ends (close or error). Unlike
+   * `onClose` — which also fires for a socket that never became ready — this is the
+   * "an established transport died" signal the caller uses to reconnect. See
+   * docs/specs/web-remote-reconnect.md.
+   */
+  onEnd?: () => void;
   onOpenSocket?: (socket: WebSocket) => void;
 }
 
@@ -93,10 +100,35 @@ export function connectViaWebSocket(
     ws.addEventListener("open", () => {
       settled = true;
       options?.onOpenSocket?.(ws);
-      const socket = wrapBrowserWebSocket(ws);
-      resolve(connectViaProtocol(new SocketProtocol(socket)));
+      resolve(createWebSocketServiceAccess(wrapBrowserWebSocket(ws), options?.onEnd));
     });
   });
+}
+
+/**
+ * Builds the service accessor for an established socket and wires the fail-closed
+ * contract: an established transport that closes (phone locked / backgrounded / BFCache
+ * freeze) rejects every in-flight and queued RPC instead of leaving them pending forever,
+ * then reports the end to `onEnd` so the caller can reconnect. Extracted so the contract
+ * is unit-testable with a fake socket. See docs/specs/web-remote-reconnect.md.
+ */
+export function createWebSocketServiceAccess(
+  socket: ISocket,
+  onEnd?: () => void,
+): IServiceAccessor {
+  const client = new ChannelClient(new SocketProtocol(socket));
+  let ended = false;
+  const handleEnd = () => {
+    if (ended) {
+      return;
+    }
+    ended = true;
+    client.dispose(new Error("WebSocket transport ended"));
+    onEnd?.();
+  };
+  socket.onClose(handleEnd);
+  socket.onEnd(handleEnd);
+  return new RemoteServiceAccess(client);
 }
 
 export function connectViaProtocol(protocol: IMessagePassingProtocol): IServiceAccessor {

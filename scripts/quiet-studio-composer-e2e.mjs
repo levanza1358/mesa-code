@@ -166,6 +166,7 @@ try {
     ["purple", "Purple"],
     ["rose", "Rose"],
     ["amber", "Amber"],
+    ["liquid", "Liquid"],
   ]) {
     await themeSelect.click();
     await page.getByRole("option", { name: label, exact: true }).click();
@@ -184,6 +185,37 @@ try {
     if (theme !== "system") {
       assert.ok(!palettes.has(palette), `Theme ${theme} must have its own surface palette`);
       palettes.add(palette);
+    }
+    if (theme === "liquid") {
+      // The glass-transparency slider only appears for Liquid, and its value drives the
+      // root --liquid-opacity (100 - transparency) that every glass token mixes against.
+      const slider = page.getByTestId("appearance-liquid-transparency");
+      assert.ok(await slider.isVisible(), "Liquid must show the glass transparency slider");
+      const initial = await slider.inputValue();
+      await slider.evaluate((el) => {
+        el.value = "80";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await page.waitForFunction(
+        () =>
+          getComputedStyle(document.documentElement).getPropertyValue("--liquid-opacity").trim() ===
+          "20%",
+      );
+      assert.equal(
+        await page.evaluate(() => localStorage.getItem("mesa-code-liquid-transparency")),
+        "80",
+      );
+      // Restore the original value so the reload palette comparison below is unaffected.
+      await slider.evaluate((el, value) => {
+        el.value = value;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }, initial);
+      await page.waitForFunction(
+        (value) =>
+          getComputedStyle(document.documentElement).getPropertyValue("--liquid-opacity").trim() ===
+          `${100 - Number(value)}%`,
+        initial,
+      );
     }
     await page.reload();
     await page.getByTestId("task-settings-button").click();

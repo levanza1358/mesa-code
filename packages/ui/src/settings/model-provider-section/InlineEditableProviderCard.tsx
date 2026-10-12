@@ -16,6 +16,7 @@ import {
 import { logger } from "@/logger.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
 import { Switch } from "@/components/ui/switch.js";
+import { Button } from "@/components/ui/button.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { isImeComposingKeyEvent } from "@/lib/imeComposition.js";
 import { resolvePendingProviderDraftSave, type ProviderDraftValues } from "./ProviderDraftSave.js";
@@ -446,7 +447,9 @@ export function InlineEditableProviderCard({
     void commitPendingDraft("idle").catch(() => undefined);
   });
   cancelIdleDraftSaveRef.current = idleDraftSave.cancel;
-  const scheduleIdleDraftSave = idleDraftSave.schedule;
+  // Connection fields no longer schedule an idle save: they are committed by the
+  // explicit Apply action. The trigger is retained so cleanup and the enabled
+  // toggle can still cancel a pending save.
   const cancelIdleDraftSave = idleDraftSave.cancel;
 
   const handleProviderEnabledChange = async (enabled: boolean) => {
@@ -506,14 +509,16 @@ export function InlineEditableProviderCard({
     [markDraftDirty],
   );
 
+  // Connection fields (Base URL, API key) are draft-only while typing. They are
+  // committed exclusively by the explicit Apply action, so no idle timer, blur, or
+  // format-change handler writes them and no provider request runs implicitly.
   const handleBaseUrlValueChange = useCallback(
     (value: string) => {
       markDraftDirty("baseUrlValue");
       draftRef.current.baseUrlValue = value;
       setBaseUrlValue(value);
-      scheduleIdleDraftSave();
     },
-    [markDraftDirty, scheduleIdleDraftSave],
+    [markDraftDirty],
   );
 
   const handleApiKeyValueChange = useCallback(
@@ -521,9 +526,8 @@ export function InlineEditableProviderCard({
       markDraftDirty("apiKeyValue");
       draftRef.current.apiKeyValue = value;
       setApiKeyValue(value);
-      scheduleIdleDraftSave();
     },
-    [markDraftDirty, scheduleIdleDraftSave],
+    [markDraftDirty],
   );
 
   const handleNameBlur = useCallback(() => {
@@ -573,11 +577,6 @@ export function InlineEditableProviderCard({
     requestAnimationFrame(() => nameInputRef.current?.focus());
   }, [provider.providerId]);
 
-  const saveConnection = useCallback(
-    () => void commitPendingDraft("connection-blur").catch(() => undefined),
-    [commitPendingDraft],
-  );
-
   const handleApiFormatChange = useCallback(
     (value: ProviderApiType) => {
       markDraftDirty("apiFormat");
@@ -588,9 +587,103 @@ export function InlineEditableProviderCard({
     [commitPendingDraft, markDraftDirty],
   );
 
+  /**
+   * True when the connection draft differs from the saved provider config, which
+   * is what enables Apply and gates Test.
+   */
+  const connectionDraftDirty =
+    baseUrlValue.trim() !== (provider.config.api?.baseUrl ?? "").trim() ||
+    apiKeyValue !== getProviderFormApiKey(provider);
+
+  const [applyingConnection, setApplyingConnection] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionApplied, setConnectionApplied] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionTestPassed, setConnectionTestPassed] = useState(false);
+  const [connectionTestCount, setConnectionTestCount] = useState<number | null>(null);
+
+  /**
+   * Commit the connection draft through the existing provider save path. This is
+   * the only writer for Base URL and API key.
+   */
+  const handleApplyConnection = useCallback(async () => {
+    if (applyingConnection) {
+      return;
+    }
+    cancelIdleDraftSave();
+    setApplyingConnection(true);
+    setConnectionError(null);
+    try {
+      await commitPendingDraft("connection-apply");
+      dirtyProviderFieldsRef.current.delete("baseUrlValue");
+      dirtyProviderFieldsRef.current.delete("apiKeyValue");
+      setConnectionApplied(true);
+    } catch (error) {
+      // A failed Apply must leave the draft and the saved config untouched.
+      setConnectionError(
+        error instanceof Error ? error.message : "Failed to apply the connection settings.",
+      );
+    } finally {
+      setApplyingConnection(false);
+    }
+  }, [applyingConnection, cancelIdleDraftSave, commitPendingDraft]);
+
+  /**
+   * Manual connectivity check. Runs only against an applied configuration, so a
+   * dirty draft must be applied first; it never fires implicitly.
+   *
+   * The connectivity service requires a persisted ModelSelection, so a provider
+   * with no models yet cannot be probed through it. In that case fall back to
+   * reading the provider's own `/models` endpoint, which still proves the Base URL
+   * and credential are reachable. Every outcome is reported — running, passed, or
+   * failed — because a silent success is indistinguishable from a dead button.
+   */
+  const handleTestConnection = useCallback(async () => {
+    if (testingConnection) {
+      return;
+    }
+    setConnectionError(null);
+    setConnectionTestPassed(false);
+    setTestingConnection(true);
+    try {
+      const modelId = models[0]?.modelId;
+      if (modelId && onTestModel) {
+        const result = await onTestModel(provider.providerId, modelId);
+        if (result.success) {
+          setConnectionTestPassed(true);
+          return;
+        }
+        setConnectionError(result.error?.message ?? "Connection test failed.");
+        return;
+      }
+
+      // No usable model selection: prove reachability with the provider catalog.
+      if (onDiscoverModels) {
+        const discovered = await onDiscoverModels(provider.providerId);
+        if (discovered.error) {
+          setConnectionError(discovered.error.message);
+          return;
+        }
+        setConnectionTestPassed(true);
+        setConnectionTestCount(discovered.models.length);
+        return;
+      }
+
+      setConnectionError(
+        "Add a model before testing the connection, or use Fetch models to discover one.",
+      );
+    } catch (error) {
+      setConnectionError(
+        error instanceof Error ? error.message : "Connection test failed unexpectedly.",
+      );
+    } finally {
+      setTestingConnection(false);
+    }
+  }, [models, onDiscoverModels, onTestModel, provider.providerId, testingConnection]);
+
   const handleApiKeyBlur = useCallback(() => {
-    void commitPendingDraft("api-key-blur").catch(() => undefined);
-  }, [commitPendingDraft]);
+    // Connection fields are committed by Apply only; blur performs no save.
+  }, []);
 
   const handleTextCommitKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") {
@@ -837,7 +930,6 @@ export function InlineEditableProviderCard({
             baseUrlValue={baseUrlValue}
             onApiFormatChange={handleApiFormatChange}
             onBaseUrlChange={handleBaseUrlValueChange}
-            onBaseUrlBlur={saveConnection}
             onBaseUrlKeyDown={handleTextCommitKeyDown}
             onBaseUrlCompositionStart={handleTechnicalInputCompositionStart}
             onBaseUrlCompositionEnd={handleTechnicalInputCompositionEnd}
@@ -857,6 +949,76 @@ export function InlineEditableProviderCard({
             onApiKeyCompositionEnd={handleTechnicalInputCompositionEnd}
             onToggleApiKeyVisibility={() => setApiKeyVisible((value) => !value)}
           />
+        ) : null}
+
+        {isAccountProvider ? null : (
+          <div className="flex flex-wrap items-center gap-2" data-testid="provider-connection-actions">
+            <Button
+              type="button"
+              size="sm"
+              variant="default"
+              data-testid="provider-connection-apply"
+              // Apply is the only writer: it enables once the draft differs from
+              // the saved config and stays disabled while committing.
+              disabled={applyingConnection || !connectionDraftDirty}
+              onClick={() => {
+                void handleApplyConnection();
+              }}
+            >
+              {applyingConnection
+                ? intl.formatMessage({ id: "settings.modelProvider.connection.applying" })
+                : intl.formatMessage({ id: "settings.modelProvider.connection.apply" })}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="provider-connection-test"
+              // Test runs only against an applied configuration, so a dirty draft
+              // must be applied first; it never fires implicitly.
+              disabled={connectionDraftDirty || applyingConnection || testingConnection}
+              onClick={() => {
+                void handleTestConnection();
+              }}
+            >
+              {testingConnection
+                ? intl.formatMessage({ id: "settings.modelProvider.connection.testing" })
+                : intl.formatMessage({ id: "settings.modelProvider.connection.test" })}
+            </Button>
+            {connectionTestPassed && !connectionError ? (
+              <span
+                className="text-ui-sm text-foreground-subtle"
+                role="status"
+                data-testid="provider-connection-test-passed"
+              >
+                {connectionTestCount === null
+                  ? intl.formatMessage({ id: "settings.modelProvider.connection.testPassed" })
+                  : intl.formatMessage(
+                      { id: "settings.modelProvider.connection.testPassedWithModels" },
+                      { count: connectionTestCount },
+                    )}
+              </span>
+            ) : null}
+            {connectionDraftDirty ? (
+              <span className="text-ui-sm text-foreground-subtle" role="status">
+                {intl.formatMessage({ id: "settings.modelProvider.connection.unapplied" })}
+              </span>
+            ) : connectionApplied ? (
+              <span className="text-ui-sm text-foreground-subtle" role="status">
+                {intl.formatMessage({ id: "settings.modelProvider.connection.applied" })}
+              </span>
+            ) : null}
+          </div>
+        )}
+
+        {connectionError ? (
+          <div
+            role="alert"
+            data-testid="provider-connection-error"
+            className="rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-ui-base text-foreground"
+          >
+            {connectionError}
+          </div>
         ) : null}
 
         <ProviderModelsSection

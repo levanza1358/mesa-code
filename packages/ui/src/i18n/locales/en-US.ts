@@ -2,6 +2,8 @@
 const enUS: Record<string, string> = {
   "notification.pill.open": "Open app",
   "notification.pill.allowOnce": "Allow once",
+  "notification.pill.showAnswer": "Show answer",
+  "notification.pill.submitAnswer": "Submit answer",
   "startPlan.recommendation.subagentDescription":
     "Your Start Plan has quota available for {model}. Switch this subagent’s model to the Start Plan?",
   "startPlan.recommendation.preferenceSaveFailed":
@@ -1259,6 +1261,7 @@ const enUS: Record<string, string> = {
   "workspace.openFolder": "Open folder",
   "workspace.openPluginsSettings": "Plugin Marketplace",
   "workspace.backToWorkspace": "Back to workspace",
+  "workspace.mobileMenu": "Open navigation",
   "workspace.noActiveForNewTask": "There is no available workspace yet. Open a workspace first.",
   "workspace.wslUncPrompt.title": "Open this through WSL remote connection?",
   "workspace.wslUncPrompt.description":
@@ -1637,6 +1640,7 @@ const enUS: Record<string, string> = {
   "chat.previewCards.xlsx": "Spreadsheet · XLSX",
   "chat.previewCards.pptx": "Presentation · PPTX",
   "chat.previewCards.pdf": "Document · PDF",
+  "chat.previewCards.image": "Image",
   "chat.previewCards.video": "Video",
   "chat.previewCards.audio": "Audio",
   "chat.previewCards.openExternal": "Open in browser",
@@ -1665,11 +1669,49 @@ const enUS: Record<string, string> = {
   "settings.subtitle":
     "Switch major settings on the left and edit the details in the panel on the right.",
   "settings.navLabel": "Sections",
+  "settings.mobileBackToList": "All settings",
   "settings.sidebar.group.general": "General",
   "settings.sidebar.group.agent": "Agent",
   "settings.sidebar.group.data": "Data",
   "settings.extensions.title": "Extensions",
   "settings.dataLocation.title": "Data Location",
+  "settings.network.title": "Network",
+  "settings.network.description":
+    "Serve this session on a local address so a browser on your LAN or Tailscale tailnet can open it.",
+  "settings.network.group.access": "Access",
+  "settings.network.group.addresses": "Addresses",
+  "settings.network.group.tailscale": "Tailscale",
+  "settings.network.enable": "Enable network access",
+  "settings.network.enableDescription":
+    "Open this session to other devices on your network. Off by default.",
+  "settings.network.disabledDescription":
+    "Network access is off. Turn it on above to list addresses.",
+  "settings.network.port": "Port",
+  "settings.network.portDescription":
+    "The listening port. 0 lets the operating system choose a free port. Apply to re-bind.",
+  "settings.network.portInvalid": "Enter a port between 0 and 65535.",
+  "settings.network.applyPort": "Apply",
+  "settings.network.refresh": "Refresh",
+  "settings.network.listeningOn": "Listening",
+  "settings.network.notListening": "Not listening",
+  "settings.network.noAddresses": "No reachable IPv4 address found on this machine.",
+  "settings.network.kindLan": "LAN",
+  "settings.network.kindTailscale": "Tailscale",
+  "settings.network.copy": "Copy address",
+  "settings.network.copyFailed": "Could not copy the address to the clipboard.",
+  "settings.network.open": "Open in browser",
+  "settings.network.tailscaleStatus": "Tailscale",
+  "settings.network.tailscaleRunning": "Tailscale is running.",
+  "settings.network.tailscaleNotRunning":
+    "Tailscale is installed but not running or not signed in.",
+  "settings.network.tailscaleMissing": "Tailscale was not detected on this machine.",
+  "settings.network.tailscaleInstall": "Install Tailscale",
+  "settings.network.tailscaleInstallDescription":
+    "Download and install Tailscale. This asks for administrator rights (a UAC / system prompt).",
+  "settings.network.tailscaleInstalling": "Installing…",
+  "settings.network.tailscaleInstallStatus": "Installation",
+  "settings.network.securityWarning":
+    "No authentication. Anyone who can reach this address gets full access to this session — running commands, reading and writing workspace files, and using your configured provider credentials. Only enable this on a network you trust.",
   "settings.nav.generalDescription": "Language and current window experience",
   "settings.nav.appearanceDescription": "Theme, UI font size, and code presentation",
   "settings.themeCardTitle": "Theme",
@@ -1694,6 +1736,7 @@ const enUS: Record<string, string> = {
   "settings.themeMode.purple": "Purple",
   "settings.themeMode.rose": "Rose",
   "settings.themeMode.amber": "Amber",
+  "settings.themeMode.liquid": "Liquid",
   "settings.accent": "Accent",
   "settings.accentDescription": "Choose the brand color. This is independent of the app theme.",
   "settings.accent.jade": "Jade",
@@ -1772,6 +1815,9 @@ const enUS: Record<string, string> = {
   "settings.uiFontSize": "UI font size",
   "settings.uiFontSizeDescription":
     "Adjust interface text without changing icons or layout dimensions.",
+  "settings.liquidTransparency": "Glass transparency",
+  "settings.liquidTransparencyDescription":
+    "How see-through the Liquid theme's glass is. Only applies to the Liquid theme.",
   "settings.systemTitle": "General",
   "settings.systemDescription": "These preferences affect the current window experience.",
   "settings.locale": "Language",
@@ -1881,12 +1927,64 @@ const enUS: Record<string, string> = {
   "settings.autoDownloadAndInstallUpdates": "Automatically download and install updates",
   "settings.autoDownloadAndInstallUpdatesDescription":
     "When enabled, updates start downloading as soon as they are found. Restart still requires confirmation when tasks are running.",
-  "settings.notification": "Task notifications",
-  "settings.notificationDescription":
-    "Send desktop notifications when a task completes, fails, or needs approval.",
-  "settings.notificationSound": "Notification sound",
-  "settings.notificationSoundDescription":
-    "When notifications are enabled, you can mute the task notification sound separately.",
+  "settings.notifications.title": "Notifications",
+  "settings.notifications.master": "Enable notifications",
+  "settings.notifications.masterDescription":
+    "Master switch for every notification channel and event below.",
+  "settings.notifications.channel.toast": "In-app toast",
+  "settings.notifications.channel.toastDescription":
+    "Show a toast inside the window while the app is focused.",
+  "settings.notifications.channel.os": "System notification",
+  "settings.notifications.channel.osDescription":
+    "Send an operating-system notification while the app is unfocused.",
+  "settings.notifications.channel.pill": "Floating pill (desktop)",
+  "settings.notifications.channel.pillDescription":
+    "Show the always-on-top pill at the screen edge while the app is unfocused. Windows only.",
+  "settings.notifications.quietWhenFocused": "Quiet while focused",
+  "settings.notifications.quietWhenFocusedDescription":
+    "Stay silent for task events while a window is focused (automatic do-not-disturb).",
+  "settings.notifications.position": "Position",
+  "settings.notifications.positionDescription": "Where notifications appear on screen.",
+  "settings.notifications.position.top-center": "Top center",
+  "settings.notifications.position.top-right": "Top right",
+  "settings.notifications.position.bottom-center": "Bottom center",
+  "settings.notifications.position.bottom-left": "Bottom left",
+  "settings.notifications.duration": "Display duration",
+  "settings.notifications.durationDescription": "How long a notification stays before it dismisses.",
+  "settings.notifications.durationSeconds": "{seconds}s",
+  "settings.notifications.event.completed": "Task completed",
+  "settings.notifications.event.completedDescription":
+    "Notify when a task finishes successfully.",
+  "settings.notifications.event.failed": "Task failed",
+  "settings.notifications.event.failedDescription": "Notify when a task ends with an error.",
+  "settings.notifications.event.permission": "Needs confirmation",
+  "settings.notifications.event.permissionDescription":
+    "Notify when a task is waiting for your approval or reply.",
+  "settings.notifications.event.subagentStalled": "Subagent stopped",
+  "settings.notifications.event.subagentStalledDescription":
+    "Notify when a subagent stops without completing (for example, it produced no progress).",
+  "settings.sound.title": "Sound",
+  "settings.sound.enable": "Notification sound",
+  "settings.sound.enableDescription":
+    "Play a sound when a notification is delivered. Turn off to keep notifications silent.",
+  "settings.sound.presetLabel": "Sound",
+  "settings.sound.presetDescription": "The built-in sound used when you have not uploaded your own.",
+  "settings.sound.preset.pop": "Pop",
+  "settings.sound.preset.ping": "Ping",
+  "settings.sound.preset.chime": "Chime",
+  "settings.sound.preset.marimba": "Marimba",
+  "settings.sound.preview": "Preview",
+  "settings.sound.volume": "Volume",
+  "settings.sound.volumeDescription": "How loud the notification sound plays.",
+  "settings.sound.custom": "Custom sound",
+  "settings.sound.customDescription": "Upload your own audio file to use instead of a preset.",
+  "settings.sound.customActive": "Using \"{name}\".",
+  "settings.sound.customChoose": "Choose file",
+  "settings.sound.customClear": "Use preset",
+  "settings.sound.customTooLarge": "That audio file is too large (max 1.5 MB).",
+  "settings.sound.customUnsupported": "Unsupported audio format. Use MP3, WAV, OGG, M4A, AAC, or FLAC.",
+  "notification.subagentStalled": "Subagent stopped",
+  "notification.subagentStalledBody": "Subagent \"{title}\" stopped without completing.",
   "notification.taskWithTitle": "Task: {title}",
   "notification.taskWaiting": "Task waiting for your confirmation",
   "notification.completed": "Task completed",
@@ -3051,6 +3149,15 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.modelsEmpty": "No models are configured. Add a model to use it in chat.",
   "settings.modelProvider.addModel": "Add model",
   "settings.modelProvider.fetchModels": "Fetch models",
+  "settings.modelProvider.connection.apply": "Apply",
+  "settings.modelProvider.connection.applying": "Applying…",
+  "settings.modelProvider.connection.test": "Test connection",
+  "settings.modelProvider.connection.testing": "Testing…",
+  "settings.modelProvider.connection.testPassed": "Connection OK",
+  "settings.modelProvider.connection.testPassedWithModels":
+    "Connection OK · {count} models available",
+  "settings.modelProvider.connection.unapplied": "Unapplied changes",
+  "settings.modelProvider.connection.applied": "Applied",
   "settings.modelProvider.discovery.title": "Fetch models from provider",
   "settings.modelProvider.discovery.description":
     "Models returned by {provider}'s /models endpoint. Select the ones you want to add; already added models are disabled.",

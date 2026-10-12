@@ -1,42 +1,88 @@
-import taskNotificationPopUrl from "@/assets/notification-sounds/task-notification-pop.mp3";
-import { isTaskNotificationSoundEnabled } from "@/lib/taskNotificationPreferences.js";
+import { readCustomNotificationSound } from "@/lib/notificationSoundCustom.js";
+import {
+  notificationSoundPresetSource,
+  resolveNotificationSoundSource,
+} from "@/lib/notificationSoundCatalog.js";
+import {
+  isTaskNotificationSoundEnabled,
+  readTaskNotificationPreferences,
+} from "@/lib/taskNotificationPreferences.js";
 
 let taskNotificationAudio: HTMLAudioElement | null = null;
+let loadedSource: string | null = null;
 
-function getTaskNotificationAudio(): HTMLAudioElement | null {
+/**
+ * The audio element for a given source. A custom sound and a preset have different sources, so the
+ * element is re-created (and re-preloaded) whenever the resolved source changes.
+ */
+function getAudioForSource(source: string): HTMLAudioElement | null {
   if (typeof Audio === "undefined") {
     return null;
   }
-
-  if (!taskNotificationAudio) {
-    taskNotificationAudio = new Audio(taskNotificationPopUrl);
+  if (!taskNotificationAudio || loadedSource !== source) {
+    taskNotificationAudio = new Audio(source);
     taskNotificationAudio.preload = "auto";
+    loadedSource = source;
   }
-
   return taskNotificationAudio;
 }
 
-export async function playTaskNotificationSound(): Promise<void> {
-  // Desktop/Web 都会在“通知已展示”后异步触发音效播放；
-  // 如果这里不再检查声音子开关，设置页里关闭提示音后运行时仍会继续响，
-  // 看起来就像设置没生效。把最终判定收口到播放器入口，能保证所有调用方行为一致。
-  if (!isTaskNotificationSoundEnabled()) {
-    return;
-  }
+function readSourceAndVolume(): { source: string; volume: number } {
+  const preferences = readTaskNotificationPreferences();
+  const custom = readCustomNotificationSound();
+  return {
+    source: resolveNotificationSoundSource({
+      preset: preferences.soundPreset,
+      customDataUrl: custom?.dataUrl,
+      presetSource: notificationSoundPresetSource,
+    }),
+    volume: preferences.soundVolume,
+  };
+}
 
-  const audio = getTaskNotificationAudio();
+async function playResolvedSound(): Promise<void> {
+  const { source, volume } = readSourceAndVolume();
+  const audio = getAudioForSource(source);
   if (!audio) {
     return;
   }
-
+  audio.volume = volume;
   try {
-    // 同一个 Audio 实例在后台通知里反复复用时，若不先回到起点，
-    // 新一轮通知经常会因为还停留在上次播放结束态而直接静默。
-    // 这里显式重置播放位置，并吞掉自动播放限制异常，避免音效失败反过来影响通知主链路。
+    // The same Audio instance is reused across notifications; rewinding first avoids a silent
+    // replay when the previous run left it at its end state.
     audio.pause();
     audio.currentTime = 0;
     await audio.play();
   } catch {
-    // 音效属于增强体验，播放失败时不打断通知主流程。
+    // Sound is an enhancement; a playback failure must not disrupt the notification path.
   }
+}
+
+export async function playTaskNotificationSound(): Promise<void> {
+  // The final check lives at the player entry so every caller honors the sound sub-switch
+  // consistently: desktop and web both trigger playback after a notification is shown.
+  if (!isTaskNotificationSoundEnabled()) {
+    return;
+  }
+  await playResolvedSound();
+}
+
+/**
+ * Plays the configured sound regardless of the enable switch, for the Settings preview: an explicit
+ * user action must make a sound even while notifications are switched off.
+ */
+export async function previewTaskNotificationSound(): Promise<void> {
+  await playResolvedSound();
+}
+
+/** Converts a picked audio file into a bounded data URL, or null when it is too large. */
+export function readNotificationSoundFileAsDataUrl(file: File): Promise<string | null> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => resolve(null);
+    reader.onload = () => {
+      resolve(typeof reader.result === "string" ? reader.result : null);
+    };
+    reader.readAsDataURL(file);
+  });
 }

@@ -37,6 +37,7 @@ import {
   ISettingsSyncService,
   IFeedbackService,
   IPromptAttachmentTransferService,
+  INetworkAccessService,
   IWindowControllerService,
   type IServiceAccessor,
 } from "@mesa-code/services";
@@ -88,6 +89,8 @@ export class RemoteServiceAccess implements IServiceAccessor {
   readonly settingsSyncService: ISettingsSyncService;
   readonly feedbackService: IFeedbackService;
   readonly promptAttachmentTransferService: IPromptAttachmentTransferService;
+  /** Desktop-host-only; absent on the plain web client's own accessor. */
+  readonly networkAccessService?: INetworkAccessService;
 
   constructor(channelClient: IChannelClient) {
     this.fileService = ProxyChannel.toService<IFileService>(
@@ -208,6 +211,12 @@ export class RemoteServiceAccess implements IServiceAccessor {
     );
     this.promptAttachmentTransferService = ProxyChannel.toService<IPromptAttachmentTransferService>(
       channelClient.getChannel(IPromptAttachmentTransferService.channelName),
+    );
+    // Desktop-host-only channel; absent from plain web / remote-workspace hosts.
+    // Reading a missing channel yields a proxy whose calls reject, and the UI
+    // gates on presence, so an undefined channel is tolerated here.
+    this.networkAccessService = ProxyChannel.toService<INetworkAccessService>(
+      channelClient.getChannel(INetworkAccessService.channelName),
     );
   }
 }

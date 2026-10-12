@@ -41,6 +41,19 @@ export function createUuid(): string {
     return runtimeCrypto.randomUUID();
   }
 
+  return createUuidFromEntropy();
+}
+
+/**
+ * UUID v4 from raw entropy only — never consults `crypto.randomUUID`.
+ *
+ * Kept separate from {@link createUuid} so the non-secure-context polyfill can
+ * install `crypto.randomUUID = createUuidFromEntropy` without re-entering
+ * `createUuid`, which would see the patched method and recurse forever.
+ */
+export function createUuidFromEntropy(): string {
+  const runtimeCrypto = globalThis.crypto;
+
   if (runtimeCrypto?.getRandomValues) {
     const bytes = new Uint8Array(16);
     runtimeCrypto.getRandomValues(bytes);

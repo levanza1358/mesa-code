@@ -327,6 +327,14 @@ export interface AppSettings {
   nativeSearchEnhancementsEnabled?: boolean;
   /** 新建或冷恢复 Session 是否启用 Memory；默认关闭。 */
   memoryEnabled?: boolean;
+  /**
+   * Local network access (LAN/Tailscale): serve the web client on a local
+   * listener so a browser can open the same session. Default off, host
+   * 0.0.0.0, port 0 (ephemeral). No authentication. See docs/specs/local-network-access.md.
+   */
+  networkAccessEnabled?: boolean;
+  networkAccessHost?: string;
+  networkAccessPort?: number;
   onboardingOccupation?:
     | "office"
     | "developer"

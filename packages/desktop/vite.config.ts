@@ -236,6 +236,10 @@ export default defineConfig(({ mode }) => {
         input: {
           index: resolve(__dirname, "src/renderer/index.html"),
           "notification-pill": resolve(__dirname, "src/renderer/notification-pill.html"),
+          "notification-pill-answers": resolve(
+            __dirname,
+            "src/renderer/notification-pill-answers.html",
+          ),
           "resource-manager": resolve(__dirname, "src/renderer/resource-manager.html"),
           "cua-permission-panel": resolve(__dirname, "src/renderer/cua-permission-panel.html"),
         },

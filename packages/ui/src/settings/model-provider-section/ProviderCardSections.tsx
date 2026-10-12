@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- 模型供应商卡片仍在迁移期集中维护多个紧耦合区块，后续拆分时再移除。 */
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -202,7 +203,11 @@ export function ProviderConnectionSection({
   baseUrlValue: string;
   onApiFormatChange: (value: ProviderApiType) => void;
   onBaseUrlChange: (value: string) => void;
-  onBaseUrlBlur: () => void;
+  /**
+   * Optional: connection fields are committed by the explicit Apply action, so
+   * callers no longer pass a blur save.
+   */
+  onBaseUrlBlur?: () => void;
   onBaseUrlKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
   onBaseUrlCompositionStart?: () => void;
   onBaseUrlCompositionEnd?: () => void;
@@ -265,8 +270,7 @@ export function ProviderConnectionSection({
           })}
           onChange={(event) => onBaseUrlChange(event.target.value)}
           onBlur={onBaseUrlBlur}
-          onKeyDown={onBaseUrlKeyDown}
-          onCompositionStart={onBaseUrlCompositionStart}
+          onKeyDown={onBaseUrlKeyDown}          onCompositionStart={onBaseUrlCompositionStart}
           onCompositionEnd={onBaseUrlCompositionEnd}
         />
       </div>
@@ -396,6 +400,17 @@ export function ProviderModelsSection({
   const { providerSettingsService } = useServices();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [discoveryDialogOpen, setDiscoveryDialogOpen] = useState(false);
+  // Stable model-id list for the discovery dialog. Passing `models.map(...)`
+  // inline created a new array on every render, which gave the dialog a new
+  // `existingIds` Set and a new `runProbe` callback, so its effect re-fired
+  // forever: an endless "Fetching model list…" even though the provider answered
+  // in a few hundred milliseconds. Derive a content key first so the array
+  // identity only changes when the set of ids actually changes.
+  const existingModelIdKey = models.map((model) => model.modelId).join("\u0000");
+  const existingModelIds = useMemo(
+    () => existingModelIdKey.split("\u0000").filter(Boolean),
+    [existingModelIdKey],
+  );
   const [addSaving, setAddSaving] = useState(false);
   const addSavingRef = useRef(false);
   const [addCommitError, setAddCommitError] = useState<string | null>(null);
@@ -616,7 +631,7 @@ export function ProviderModelsSection({
           open={discoveryDialogOpen}
           providerId={providerId}
           providerName={providerName ?? providerId}
-          existingModelIds={models.map((model) => model.modelId)}
+          existingModelIds={existingModelIds}
           fetchModels={onDiscoverModels}
           onAddSelected={onAddDiscoveredModels}
           onOpenChange={setDiscoveryDialogOpen}

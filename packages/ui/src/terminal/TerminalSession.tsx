@@ -449,7 +449,7 @@ export function TerminalSession({
         if (!(e.metaKey || e.ctrlKey)) return true;
         const key = e.key.toLowerCase();
         if (key === "c" && term.hasSelection()) {
-          void navigator.clipboard.writeText(term.getSelection()).catch((err) => {
+          void navigator.clipboard?.writeText(term.getSelection()).catch((err) => {
             logger.warn("[Terminal] copy via shortcut failed:", err);
           });
           return false;
@@ -463,8 +463,10 @@ export function TerminalSession({
           // 待后续重构收敛为单一 wireTerminalProcessing 后此注释删除。
           e.preventDefault();
           e.stopPropagation();
+          // `navigator.clipboard` is secure-context-only (undefined on the plain http
+          // LAN web mirror): optional-chain so Ctrl+V never throws there.
           navigator.clipboard
-            .readText()
+            ?.readText()
             .then((text) => {
               logger.debug("[Terminal] paste via shortcut", { length: text.length });
               if (text) term.paste(text);
@@ -820,7 +822,7 @@ export function TerminalSession({
       if (!(e.metaKey || e.ctrlKey)) return true;
       const key = e.key.toLowerCase();
       if (key === "c" && term.hasSelection()) {
-        void navigator.clipboard.writeText(term.getSelection()).catch((err) => {
+        void navigator.clipboard?.writeText(term.getSelection()).catch((err) => {
           logger.warn("[Terminal] copy via shortcut failed:", err);
         });
         return false;
@@ -832,8 +834,10 @@ export function TerminalSession({
         // 因此必须先取消默认事件，再保留手动读取剪贴板的单次写入。
         e.preventDefault();
         e.stopPropagation();
+        // `navigator.clipboard` is secure-context-only (undefined on the plain http
+        // LAN web mirror): optional-chain so Ctrl+V never throws there.
         navigator.clipboard
-          .readText()
+          ?.readText()
           .then((text) => {
             logger.debug("[Terminal] paste via shortcut", { length: text.length });
             if (text) term.paste(text);
@@ -1087,7 +1091,7 @@ export function TerminalSession({
   const handleCopy = () => {
     const term = termRef.current;
     if (!term?.hasSelection()) return;
-    void navigator.clipboard.writeText(term.getSelection()).catch((err) => {
+    void navigator.clipboard?.writeText(term.getSelection()).catch((err) => {
       logger.warn("[Terminal] copy via context menu failed:", err);
     });
   };
@@ -1096,7 +1100,7 @@ export function TerminalSession({
     const term = termRef.current;
     if (!term) return;
     navigator.clipboard
-      .readText()
+      ?.readText()
       .then((text) => text && term.paste(text))
       .catch((err) => logger.warn("[Terminal] paste via context menu failed:", err));
   };

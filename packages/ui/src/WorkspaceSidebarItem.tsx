@@ -53,7 +53,10 @@ import {
   formatRemoteWorkspaceDisplayLabel,
 } from "@/lib/remoteWorkspaceHistory.js";
 import { TaskList } from "@/TaskList.js";
-import { selectWorkspaceMesaCodeState, useMesaCodeSessionStore } from "@/store/mesa-code-session-store.js";
+import {
+  selectWorkspaceMesaCodeState,
+  useMesaCodeSessionStore,
+} from "@/store/mesa-code-session-store.js";
 import type { WorkspaceTabState } from "@/store/tabStore.js";
 import type { RemoteConnectionLogEntry } from "@/hooks/useRemoteConnectionLogs.js";
 import { ReconnectingRemoteWorkspaceLogTooltip } from "@/WorkspaceSidebar/ReconnectingRemoteWorkspaceLogTooltip.js";
@@ -753,16 +756,21 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
       return;
     }
 
-    navigator.clipboard.writeText(remoteWorkspaceError).then(() => {
-      setIsRemoteErrorCopied(true);
-      if (remoteErrorCopyResetRef.current !== null) {
-        window.clearTimeout(remoteErrorCopyResetRef.current);
-      }
-      remoteErrorCopyResetRef.current = window.setTimeout(() => {
-        setIsRemoteErrorCopied(false);
-        remoteErrorCopyResetRef.current = null;
-      }, 1500);
-    });
+    // `navigator.clipboard` is secure-context-only (undefined on the plain http LAN
+    // web mirror): optional-chain + swallow so a copy click never throws there.
+    void navigator.clipboard
+      ?.writeText(remoteWorkspaceError)
+      .then(() => {
+        setIsRemoteErrorCopied(true);
+        if (remoteErrorCopyResetRef.current !== null) {
+          window.clearTimeout(remoteErrorCopyResetRef.current);
+        }
+        remoteErrorCopyResetRef.current = window.setTimeout(() => {
+          setIsRemoteErrorCopied(false);
+          remoteErrorCopyResetRef.current = null;
+        }, 1500);
+      })
+      .catch(() => undefined);
   }, [remoteWorkspaceError]);
   const renderWorkspaceIcon = () => {
     // workspace 行之前在 hover/展开时会把目录图标切成箭头，

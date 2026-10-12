@@ -58,6 +58,17 @@ export function ProviderModelDiscoveryDialog({
     [existingModelIds],
   );
 
+  // Content key for the existing-model set. `runProbe` must not depend on the
+  // `Set` or array identity: a caller passing an inline array would otherwise
+  // rebuild the Set every render, giving `runProbe` a new identity and making the
+  // effect below re-fire endlessly (a permanent "Fetching model list…").
+  const existingIdsKey = useMemo(
+    () => [...existingIds].sort().join("\u0000"),
+    [existingIds],
+  );
+  const existingIdsRef = useRef(existingIds);
+  existingIdsRef.current = existingIds;
+
   const runProbe = useCallback(async () => {
     const token = requestTokenRef.current + 1;
     requestTokenRef.current = token;
@@ -76,7 +87,8 @@ export function ProviderModelDiscoveryDialog({
       }
       setDiscovered(result.models);
       // 已经存在的模型默认不选中，避免重复提交。
-      setSelected(new Set(result.models.filter((modelId) => !existingIds.has(modelId))));
+      const currentExistingIds = existingIdsRef.current;
+      setSelected(new Set(result.models.filter((modelId) => !currentExistingIds.has(modelId))));
       setPhase("ready");
     } catch (error) {
       if (token !== requestTokenRef.current) return;
@@ -84,7 +96,10 @@ export function ProviderModelDiscoveryDialog({
       setPhase("failed");
       setErrorMessage(error instanceof Error ? error.message : String(error));
     }
-  }, [existingIds, providerId]);
+    // Deliberately keyed by providerId only (plus the content key below via the
+    // effect): `existingIds` is read through a ref so a new Set identity cannot
+    // restart the probe.
+  }, [providerId, existingIdsKey]);
 
   useEffect(() => {
     if (!open) {

@@ -6,7 +6,10 @@ import type {
 } from "@mesa-code/shared/mesa-code-protocol-v4";
 import {
   isCurrentNotificationPillAnswer,
+  isCurrentNotificationPillUserInputAnswer,
+  notificationPillAnswerPrompt,
   notificationPillOptions,
+  notificationPillUserInputContent,
   readNotificationPillAppearance,
 } from "@/lib/notification-pill.js";
 import { useMesaCodeIntl } from "@/i18n/IntlProvider.js";
@@ -24,6 +27,7 @@ export function useNotificationPill(params: {
   busy: boolean;
   failed: boolean;
   respond: (interactionId: string, optionId: string) => Promise<boolean>;
+  respondUserInput: (interactionId: string, content: Record<string, unknown>) => Promise<boolean>;
 }) {
   const { intl } = useMesaCodeIntl();
   const {
@@ -37,6 +41,7 @@ export function useNotificationPill(params: {
     busy,
     failed,
     respond,
+    respondUserInput,
   } = params;
   const latestSnapshot = useRef(snapshot);
   latestSnapshot.current = snapshot;
@@ -127,6 +132,10 @@ export function useNotificationPill(params: {
                   : "chat.permission.deny",
             }),
           })),
+          answerPrompt: notificationPillAnswerPrompt(pending, {
+            showLabel: intl.formatMessage({ id: "notification.pill.showAnswer" }),
+            submitLabel: intl.formatMessage({ id: "notification.pill.submitAnswer" }),
+          }),
           openLabel: intl.formatMessage({ id: "notification.pill.open" }),
           error: failed ? intl.formatMessage({ id: "chat.permission.responseFailed" }) : "",
           busy: busy || answerPending,
@@ -139,6 +148,8 @@ export function useNotificationPill(params: {
   currentRequestKey.current = requestKey;
   const respondRef = useRef(respond);
   respondRef.current = respond;
+  const respondUserInputRef = useRef(respondUserInput);
+  respondUserInputRef.current = respondUserInput;
   useEffect(() => {
     if (!platform?.presentNotificationPill || !presentation || accepted.current === requestKey)
       return;
@@ -181,18 +192,28 @@ export function useNotificationPill(params: {
           });
           return;
         }
+        const userInput = Boolean(value?.answerPrompt);
+        const valid = userInput
+          ? isCurrentNotificationPillUserInputAnswer(action, value)
+          : isCurrentNotificationPillAnswer(action, value);
         if (
-          !isCurrentNotificationPillAnswer(action, value) ||
+          !valid ||
           accepted.current === currentRequestKey.current ||
-          !action.optionId ||
+          (!userInput && !action.optionId) ||
           !value?.context.requestId
         )
           return;
         inFlight.current = true;
         setAnswerPending(true);
         const answeredKey = currentRequestKey.current;
-        void respondRef
-          .current(value.context.requestId, action.optionId)
+        const submit =
+          userInput && value?.answerPrompt
+            ? respondUserInputRef.current(
+                value.context.requestId,
+                notificationPillUserInputContent(value.answerPrompt, action.answers ?? []),
+              )
+            : respondRef.current(value.context.requestId, action.optionId!);
+        void submit
           .then((ok) => {
             if (ok) {
               accepted.current = answeredKey;

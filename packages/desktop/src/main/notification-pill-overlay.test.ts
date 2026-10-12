@@ -11,6 +11,7 @@ import {
 import {
   createNotificationPillOverlay,
   notificationPillBounds,
+  notificationPillPanelBounds,
 } from "./notification-pill-overlay.js";
 
 class FakeWindow extends EventEmitter {
@@ -101,8 +102,11 @@ function harness(platform = "win32", loadFailure = false) {
   const source = new FakeWindow();
   const overlay = new FakeWindow();
   overlay.webContents.id = 2;
+  const panel = new FakeWindow();
+  panel.webContents.id = 3;
   let focused = false;
   const timers = new Set<() => void>();
+  const scheduledDelays: number[] = [];
   const owner = createNotificationPillOverlay({
     platform,
     ipcMain: ipc as never,
@@ -111,12 +115,17 @@ function harness(platform = "win32", loadFailure = false) {
     loadWindow: async () => {
       if (loadFailure) throw new Error("synthetic load failure");
     },
+    createPanelWindow: () => panel as never,
+    loadPanelWindow: async () => {
+      if (loadFailure) throw new Error("synthetic load failure");
+    },
     isMainRenderer: (id) => id === 1,
     sourceWindow: () => source as never,
     isAppFocused: () => focused,
     warn: () => {},
-    schedule: ((callback: () => void) => {
+    schedule: ((callback: () => void, delayMs: number) => {
       timers.add(callback);
+      scheduledDelays.push(delayMs);
       return callback;
     }) as never,
     cancel: ((callback: () => void) => timers.delete(callback)) as never,
@@ -138,15 +147,37 @@ function harness(platform = "win32", loadFailure = false) {
       { sender, senderFrame: sender.mainFrame },
       { token, ...(optionId ? { optionId } : {}), action },
     );
+  const reveal = (token = "token") =>
+    ipc.emit(
+      NotificationPillChannels.action,
+      { sender: overlay.webContents, senderFrame: overlay.webContents.mainFrame },
+      { token, action: "reveal" },
+    );
+  const answerFromPanel = (
+    token = "token",
+    answers: Array<{ question: string; values: string[] }> | undefined = [
+      { question: "Which library should we use?", values: ["a"] },
+    ],
+    sender = panel.webContents,
+  ) =>
+    ipc.emit(
+      NotificationPillChannels.action,
+      { sender, senderFrame: sender.mainFrame },
+      { token, action: "answer", ...(answers ? { answers } : {}) },
+    );
   return {
     source,
     overlay,
+    panel,
     ipc,
     display,
     owner,
     publish,
     act,
+    reveal,
+    answerFromPanel,
     timers,
+    scheduledDelays,
     focus: () => {
       focused = true;
       owner.onAppFocus();
@@ -314,5 +345,156 @@ test("non-Windows and strict validation fail hidden; positioning clamps negative
     y: -100,
     width: 200,
     height: 100,
+  });
+});
+
+// docs/specs/notification-settings.md rule 6: the pill anchors at the configured position, and an
+// absent position keeps the legacy top-center placement.
+test("notificationPillBounds honors the configured anchor", () => {
+  const area = { x: 0, y: 0, width: 1920, height: 1080 };
+  // Legacy default: centered horizontally, 8px from the top.
+  assert.deepEqual(notificationPillBounds(area), {
+    x: 700,
+    y: 8,
+    width: 520,
+    height: 180,
+  });
+  assert.deepEqual(notificationPillBounds(area, "top-center"), notificationPillBounds(area));
+  // top-right: right-aligned with a 12px margin.
+  assert.deepEqual(notificationPillBounds(area, "top-right"), {
+    x: 1388,
+    y: 8,
+    width: 520,
+    height: 180,
+  });
+  // bottom-center: centered, 8px from the bottom.
+  assert.deepEqual(notificationPillBounds(area, "bottom-center"), {
+    x: 700,
+    y: 892,
+    width: 520,
+    height: 180,
+  });
+  // bottom-left: left-aligned with a 12px margin, bottom-anchored.
+  assert.deepEqual(notificationPillBounds(area, "bottom-left"), {
+    x: 12,
+    y: 892,
+    width: 520,
+    height: 180,
+  });
+});
+
+// docs/specs/notification-settings.md rule 6: a status pill auto-dismisses after its configured
+// duration; without one it keeps the legacy 8000 ms.
+test("status pill auto-dismiss uses the configured duration when present", async () => {
+  const withDuration = harness();
+  withDuration.publish({ ...presentation("status", "status"), durationMs: 12000 });
+  await Promise.resolve();
+  assert.deepEqual(withDuration.scheduledDelays, [12000]);
+  withDuration.owner.dispose();
+
+  const withoutDuration = harness();
+  withoutDuration.publish(presentation("status", "status"));
+  await Promise.resolve();
+  assert.deepEqual(withoutDuration.scheduledDelays, [8000]);
+  withoutDuration.owner.dispose();
+});
+
+function userInputPresentation(
+  token = "question",
+): NotificationPillPresentation {
+  return {
+    ...presentation(token, "permission"),
+    answerPrompt: {
+      showLabel: "Show answer",
+      submitLabel: "Submit answer",
+      questions: [
+        {
+          question: "Which library should we use?",
+          header: "Library",
+          multiSelect: false,
+          options: [
+            { value: "a", label: "Option A" },
+            { value: "b", label: "Option B" },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+test("reveal opens the answer panel under the pill; a selection relays from the panel", async () => {
+  const h = harness();
+  h.publish(userInputPresentation());
+  await Promise.resolve();
+  assert.equal(h.panel.shown, false, "panel stays closed until revealed");
+  h.reveal("stale");
+  h.reveal("question");
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(h.panel.shown, true, "reveal opens the panel");
+  assert.equal(h.owner.ownsWindow(h.panel), true);
+  // The panel is only reachable from the compact pill when the presentation has an answer surface.
+  const noPrompt = harness();
+  noPrompt.publish(presentation("token", "permission"));
+  await Promise.resolve();
+  noPrompt.reveal();
+  await Promise.resolve();
+  assert.equal(noPrompt.panel.shown, false);
+  noPrompt.owner.dispose();
+  // Answering from the panel relays the selections to the owning renderer.
+  h.answerFromPanel("question", [{ question: "Which library should we use?", values: ["a"] }]);
+  await Promise.resolve();
+  assert.equal(h.source.sent.length, 1);
+  assert.equal(h.source.sent[0][0], NotificationPillChannels.reply);
+  const reply = h.source.sent[0][1] as { answers: unknown; action: string };
+  assert.equal(reply.action, "answer");
+  assert.deepEqual(reply.answers, [{ question: "Which library should we use?", values: ["a"] }]);
+  assert.equal(h.source.restored, false, "answering must not restore the source");
+  // Not an overlay sender: rejected.
+  h.answerFromPanel("question", undefined, h.source.webContents);
+  assert.equal(h.source.sent.length, 1);
+  h.owner.dispose();
+});
+
+test("resolving, focusing, or replacing clears the panel with the pill", async () => {
+  const focused = harness();
+  focused.publish(userInputPresentation());
+  await Promise.resolve();
+  focused.reveal("question");
+  await Promise.resolve();
+  assert.equal(focused.panel.shown, true);
+  focused.focus();
+  assert.equal(focused.panel.shown, false, "app focus hides the panel");
+  assert.equal(focused.overlay.shown, false);
+  focused.owner.dispose();
+  // A replacement presentation collapses an open panel again.
+  const replaced = harness();
+  replaced.publish(userInputPresentation());
+  await Promise.resolve();
+  replaced.reveal("question");
+  await Promise.resolve();
+  assert.equal(replaced.panel.shown, true);
+  replaced.publish(userInputPresentation("next"));
+  await Promise.resolve();
+  assert.equal(replaced.panel.shown, false, "a replacement presentation collapses the panel");
+  replaced.owner.dispose();
+});
+
+test("panel bounds sit under the pill and flip above on bottom overflow", () => {
+  const area = { x: 0, y: 0, width: 1000, height: 700 };
+  const topPill = { x: 240, y: 8, width: 520, height: 180 };
+  assert.deepEqual(notificationPillPanelBounds(topPill, area), {
+    x: 240,
+    y: 192,
+    width: 520,
+    height: 360,
+  });
+  // Bottom-anchored pill overflows; the panel flips above it.
+  const bottomPill = { x: 240, y: 512, width: 520, height: 180 };
+  assert.deepEqual(notificationPillPanelBounds(bottomPill, area), {
+    x: 240,
+    y: 148,
+    width: 520,
+    height: 360,
   });
 });

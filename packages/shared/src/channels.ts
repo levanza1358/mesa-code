@@ -144,6 +144,8 @@ export const ServiceChannels = {
   PromptAttachmentTransfer: "prompt-attachment-transfer",
   /** 闲时任务管理服务（与 automation 服务面独立） */
   OffPeakTask: "off-peak-task",
+  /** 本机网络访问（LAN/Tailscale）监听服务，仅桌面 Host 提供 */
+  NetworkAccess: "network-access",
 } as const;
 
 export type ServiceChannelName = (typeof ServiceChannels)[keyof typeof ServiceChannels];

@@ -1,5 +1,5 @@
 import { BufferWriter, serialize } from "@mesa-code/rpc";
-import { ServiceChannels } from "@mesa-code/shared";
+import { ServiceChannels, sha256 } from "@mesa-code/shared";
 import {
   PROTOCOL_V4_LIMITS,
   type V4AttachmentBeginResult,
@@ -87,12 +87,12 @@ function encodeBase64(bytes: Uint8Array): string {
 }
 
 async function checksum(bytes: Uint8Array): Promise<string> {
-  if (!globalThis.crypto?.subtle) throw new Error("fault.attachment.checksumUnavailable");
-  // WebCrypto 的 BufferSource 要求 ArrayBuffer；复制也避免调用期间底层 view 被复用。
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer);
-  const hex = [...new Uint8Array(digest)]
-    .map((value) => value.toString(16).padStart(2, "0"))
-    .join("");
+  // `crypto.subtle` is secure-context-only, so the LAN web mirror on a phone over
+  // plain http has no `subtle`. The shared helper prefers WebCrypto and falls back
+  // to a pure-JS digest, so attachment uploads keep working off-localhost instead
+  // of failing on that origin.
+  const digest = await sha256(bytes);
+  const hex = [...digest].map((value) => value.toString(16).padStart(2, "0")).join("");
   return `sha256:${hex}`;
 }
 

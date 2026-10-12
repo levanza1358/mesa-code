@@ -29,10 +29,19 @@ import {
   UI_FONT_SIZE_STORAGE_KEY,
 } from "@/lib/uiFontSize.js";
 import {
+  applyLiquidTransparency,
+  normalizeLiquidTransparency,
+  writeLiquidTransparency,
+} from "@/lib/liquidTransparency.js";
+import {
   isTaskNotificationEnabled,
   isTaskNotificationSoundPreferenceEnabled,
   persistTaskNotificationEnabled,
   persistTaskNotificationSoundEnabled,
+  persistTaskNotificationPreferences,
+  readTaskNotificationPreferences,
+  mergeTaskNotificationPreferences,
+  type TaskNotificationPreferences,
 } from "@/lib/taskNotificationPreferences.js";
 import { applyTheme, normalizeThemePreference, resolveTheme, type Theme } from "../useTheme.js";
 import { applyAccent, normalizeAccent, writeStoredAccent, type Accent } from "../accent.js";
@@ -102,6 +111,10 @@ export interface MesaCodeState extends AppearanceState {
   notificationSoundEnabled: boolean;
   setNotificationSoundEnabled: (enabled: boolean) => void;
 
+  /** Typed notification preferences record (channels, position, duration, per-event toggles). */
+  notificationPreferences: TaskNotificationPreferences;
+  setNotificationPreferences: (patch: Partial<TaskNotificationPreferences>) => void;
+
   /** Coding Plan 额度重置 UI 状态；entry/观察记录只在当前窗口内共享，不持久化。 */
   codingPlanQuotaResetUiBySource: Record<string, CodingPlanQuotaResetUiEntries>;
   /** 自动/运营完成首次被观察时所属的鉴权会话，用于区分同会话后挂载和重新登录。 */
@@ -138,9 +151,19 @@ export interface MesaCodeState extends AppearanceState {
 // 需要广播的字段 —— 只有这些字段的变更会发送给其他窗口
 // ============================================================================
 
-const BROADCAST_FIELDS = new Set<string>(APPEARANCE_BROADCAST_FIELDS);
+const BROADCAST_FIELDS = new Set<string>([
+  ...APPEARANCE_BROADCAST_FIELDS,
+  // Notification preferences sync across windows like the appearance fields; a change in one window
+  // (e.g. the position picker) must apply in every other window without a reload.
+  "notificationPreferences",
+]);
 
-type BroadcastField = AppearanceBroadcastField;
+type BroadcastField = AppearanceBroadcastField | "notificationPreferences";
+
+/** Whether a store field is mirrored to other windows. Exported for a focused sync test. */
+export function isBroadcastField(field: string): field is BroadcastField {
+  return BROADCAST_FIELDS.has(field);
+}
 
 /** 广播频道名前缀 */
 const STATE_CHANNEL_PREFIX = "state:";
@@ -194,6 +217,12 @@ export function createMesaCodeStore(broadcastService: IBroadcastService) {
       applyUiFontSizePx(normalizedFontSizePx);
       set({ uiFontSizePx: normalizedFontSizePx });
     },
+    setLiquidTransparency: (transparency: number) => {
+      const normalized = normalizeLiquidTransparency(transparency);
+      writeLiquidTransparency(normalized);
+      applyLiquidTransparency(normalized);
+      set({ liquidTransparency: normalized });
+    },
 
     codePreviewSettings: loadCodePreviewSettings(),
     setCodePreviewSettings: (patch: Partial<CodePreviewSettings>) =>
@@ -221,14 +250,34 @@ export function createMesaCodeStore(broadcastService: IBroadcastService) {
     notificationEnabled: isTaskNotificationEnabled(),
     setNotificationEnabled: (enabled: boolean) => {
       persistTaskNotificationEnabled(enabled);
-      set({ notificationEnabled: enabled });
+      set((state) => ({
+        notificationEnabled: enabled,
+        notificationPreferences: { ...state.notificationPreferences, enabled },
+      }));
     },
 
     authSessionSeq: 0,
     notificationSoundEnabled: isTaskNotificationSoundPreferenceEnabled(),
     setNotificationSoundEnabled: (enabled: boolean) => {
       persistTaskNotificationSoundEnabled(enabled);
-      set({ notificationSoundEnabled: enabled });
+      set((state) => ({
+        notificationSoundEnabled: enabled,
+        notificationPreferences: { ...state.notificationPreferences, sound: enabled },
+      }));
+    },
+
+    notificationPreferences: readTaskNotificationPreferences(),
+    setNotificationPreferences: (patch: Partial<TaskNotificationPreferences>) => {
+      set((state) => {
+        const next = mergeTaskNotificationPreferences(state.notificationPreferences, patch);
+        persistTaskNotificationPreferences(next);
+        return {
+          notificationPreferences: next,
+          // Keep the legacy scalar mirrors coherent so any remaining reader of the old fields agrees.
+          notificationEnabled: next.enabled,
+          notificationSoundEnabled: next.sound,
+        };
+      });
     },
 
     codingPlanQuotaResetUiBySource: {},
@@ -323,6 +372,11 @@ export function createMesaCodeStore(broadcastService: IBroadcastService) {
         state.setLocale(msg.payload);
       } else if (field === "uiFontSizePx" && typeof msg.payload === "number") {
         state.setUiFontSizePx(msg.payload);
+      } else if (field === "liquidTransparency" && typeof msg.payload === "number") {
+        state.setLiquidTransparency(msg.payload);
+      } else if (field === "notificationPreferences" && typeof msg.payload === "object" && msg.payload) {
+        // Persist + apply the incoming record; the setter writes localStorage and updates the store.
+        state.setNotificationPreferences(msg.payload as Partial<TaskNotificationPreferences>);
       }
     } finally {
       applyingBroadcast = false;
@@ -333,6 +387,7 @@ export function createMesaCodeStore(broadcastService: IBroadcastService) {
   applyTheme(useStore.getState().theme);
   applyAccent(useStore.getState().accent, resolveTheme(useStore.getState().theme));
   applyUiFontSizePx(useStore.getState().uiFontSizePx);
+  applyLiquidTransparency(useStore.getState().liquidTransparency);
   document.documentElement.classList.toggle(
     "dark",
     resolveTheme(useStore.getState().theme) === "dark",

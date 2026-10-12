@@ -11,6 +11,7 @@ mock-cdn/
 packages/desktop/bundled-resources/
 packages/desktop/bundled-agents/
 packages/desktop/bundled-tools/
+packages/desktop/bundled-web/
 packages/desktop/mock-cdn/
 *.tsbuildinfo
 .DS_Store
@@ -101,3 +102,10 @@ release/
 *.p12
 *.cer
 *.certSigningRequest
+
+# Local installer-build tool cache (downloaded binaries, see .tools/README.md)
+.tools/
+
+# Rust build output for the 7za extraction shim (see scripts/tools/seven-zip-shim).
+# The prebuilt binary ships under prebuilt/, so target/ is disposable.
+/scripts/tools/seven-zip-shim/target/

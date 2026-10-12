@@ -58,6 +58,12 @@ try {
   // Preserve its runtime-asset preparation and stale `out` cleanup explicitly
   // before rebuilding bundles or starting Electron.
   await run(pnpmCommand, ["--filter", "@mesa-code/desktop", "pre-dev"]);
+  // Build the web client (packages/web/dist) so the Settings → Network mirror can
+  // serve the real UI. dev:desktop's own vite watcher only builds the desktop
+  // renderer; the LAN listener serves the built web SPA from packages/web/dist,
+  // and the host resolves it there in dev. Skipping this leaves the mirror with a
+  // missing static root ("Web client bundle not found").
+  await run(pnpmCommand, ["--filter", "@mesa-code/web", "build"]);
   // On Windows, use "node" (resolved via PATHEXT) to avoid "C:\Program Files\..." space issues
   await run(process.platform === "win32" ? "node" : process.execPath, [
     resolve(repoRoot, "scripts/build-desktop-agent-cli.mjs"),

@@ -1,9 +1,11 @@
 import type { TaskNotificationPayload } from "@mesa-code/shared";
 import type {
+  ConversationRow,
   ConversationSnapshot,
   PendingInteraction,
   SessionPhase,
   SessionSummary,
+  SubagentRow,
   UserInputRequestPayload,
 } from "@mesa-code/shared/mesa-code-protocol-v4";
 import type { IntlInstance } from "@/i18n/index.js";
@@ -79,6 +81,52 @@ export function collectTerminalTaskNotificationPayloads(params: {
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A subagent row whose terminal state was *not* success: failed or cancelled/stopped. */
+function subagentStalledRow(row: ConversationRow): SubagentRow | null {
+  if (row.kind !== "subagent") return null;
+  return row.status === "success" || row.status === "running" ? null : row;
+}
+
+function subagentTitle(row: SubagentRow): string {
+  const summary = row.summaryText.trim();
+  if (summary) return summary;
+  const type = row.subagentType.trim();
+  return type || "subagent";
+}
+
+/**
+ * Subagent-stall notifications (docs/specs/notification-settings.md rule 8).
+ *
+ * A subagent row that lands in a non-success terminal state (failed, or cancelled by the user /
+ * the inactivity watchdog) raises one notification. The row's identity is stable across the
+ * window's snapshots, so a row that already stopped is not re-notified on the next snapshot; the
+ * `requestId` carries the row id so the desktop main-process dedupe does not collapse two stalled
+ * subagents of the same session into one.
+ */
+export function collectSubagentStalledNotificationPayloads(params: {
+  snapshot: ConversationSnapshot;
+  previouslySeenRowIds: ReadonlySet<number>;
+  formatMessage: FormatMessage;
+}): TaskNotificationPayload[] {
+  const payloads: TaskNotificationPayload[] = [];
+  for (const row of params.snapshot.rows.window) {
+    const stalled = subagentStalledRow(row);
+    if (!stalled) continue;
+    if (params.previouslySeenRowIds.has(stalled.rowId)) continue;
+    payloads.push({
+      taskId: params.snapshot.sessionId,
+      status: "subagent_stalled",
+      requestId: String(stalled.rowId),
+      title: params.formatMessage({ id: "notification.subagentStalled" }),
+      body: params.formatMessage(
+        { id: "notification.subagentStalledBody" },
+        { title: subagentTitle(stalled) },
+      ),
+    });
+  }
+  return payloads;
 }
 
 function isPlanApprovalInteraction(payload: UserInputRequestPayload): boolean {

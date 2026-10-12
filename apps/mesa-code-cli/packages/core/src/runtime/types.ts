@@ -140,7 +140,10 @@ export interface AgentRuntimeConfig {
   };
   subagents?: {
     enabled?: boolean;
-    // foreground subagent 没有任何 child 事件的最大静默时间；默认对齐模型流 idle timeout。
+    // Foreground/child subagent activity watchdog: the longest a child may go without emitting
+    // any child session event before it is aborted as stalled. Deliberately bounded below the
+    // model-stream idle timeout so the watchdog fires first; defaults to
+    // DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS (120s), NOT the longer stream-idle timeout.
     inactivityTimeoutMs?: number;
     autoBackgroundMs?: number;
     backgroundBashMaxMs?: number;

@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { delimiter } from "node:path";
 import process from "node:process";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -23,6 +24,8 @@ import {
   runCommandAndReadStdout,
 } from "../../../scripts/spawn-command.mjs";
 import { resolveIntranetDepsBaseUrl } from "../../../scripts/intranetDefaults.mjs";
+import { binDir } from "../../../scripts/tools/tool-bootstrap.mjs";
+import { resolveSevenZip } from "../../../scripts/tools/seven-zip.mjs";
 
 const desktopRoot = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(desktopRoot, "../..");
@@ -689,6 +692,47 @@ function verifyPackagedRuntimeDependencies(os, arch) {
   }
 }
 
+/**
+ * Ensure the electron-builder helper tools exist in `.tools/`.
+ *
+ * `app-builder` (the Go binary electron-builder shells out to) downloads and
+ * extracts these bundles itself, into its own hashed cache directories. That
+ * extraction runs `7za` from `PATH`, and on Windows the winCodeSign bundle's
+ * macOS symlink entries make it fail without elevation.
+ *
+ * Preparing the bundles through the tool bootstrap verifies and caches them
+ * once; `resolveToolEnvironment` then puts the 7za shim on `PATH` for the
+ * packaging child process so any extraction app-builder performs still succeeds.
+ */
+async function ensureInstallerTools(env) {
+  const mergedEnv = { ...process.env, ...env };
+  const { ensureTools, resolveToolsDir } = await import(
+    "../../../scripts/tools/tool-bootstrap.mjs"
+  );
+
+  await ensureTools({ profile: "installer", env: mergedEnv });
+  console.log(`[bundle] tools cache: ${resolveToolsDir(mergedEnv)}`);
+}
+
+/**
+ * Build the environment additions that make electron-builder's own tool
+ * extraction work on an unprivileged Windows host.
+ *
+ * The 7za shim is placed first on `PATH` so `app-builder` picks it up instead of
+ * the plain 7za, which aborts on the winCodeSign bundle's macOS symlinks.
+ */
+function resolveToolEnvironment() {
+  const bin = binDir();
+  if (!existsSync(bin)) {
+    return {};
+  }
+
+  return {
+    PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
+    MESA_CODE_REAL_7ZA: resolveSevenZip(process.env),
+  };
+}
+
 async function main() {
   const { os, arch, skipPrepare, skipBuild, dryRun } = parseArgs(process.argv.slice(2));
   const buildArgs = [
@@ -708,8 +752,8 @@ async function main() {
     MESA_CODE_TARGET_ARCH: arch,
     ...createElectronRuntimeMirrorEnv(resolveElectronMirror()),
     ...createElectronBuilderBinariesMirrorEnv(resolveElectronBuilderBinariesMirror()),
+    ...resolveToolEnvironment(),
   };
-
   if (dryRun) {
     console.log(`[bundle] dry-run: ${pnpmCommand} ${buildArgs.join(" ")}`);
     process.exit(0);
@@ -722,6 +766,11 @@ async function main() {
   if (!skipBuild) {
     run(pnpmCommand, ["build"], buildEnv);
   }
+
+  // Prepare the non-npm tools electron-builder needs (winCodeSign, nsis,
+  // nsis-resources) before packaging. Missing tools are downloaded and verified
+  // here, so packaging never fails partway through on an absent binary.
+  await runTimedAsync("bundle:ensure-tools", () => ensureInstallerTools(buildEnv));
 
   await runTimedAsync("bundle:electron-builder", () =>
     runElectronBuilderWithRetry(buildArgs, buildEnv),

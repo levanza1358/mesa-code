@@ -48,7 +48,7 @@ export function TaskListItemContextMenu({
   onOpenInSplitPane?: () => void;
   /** 叶子数达上限且该 session 未在任何 pane 时禁用。 */
   openInSplitPaneDisabled?: boolean;
-  onOpenTaskFeedback: () => void;
+  onOpenTaskFeedback?: () => void;
   onOpenTaskPathInFileManager: () => void;
   onCopyWorkspacePath: () => void;
   onCopyTaskPath: () => void;

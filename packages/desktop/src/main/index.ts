@@ -1966,6 +1966,29 @@ app.whenReady().then(async () => {
       process.env["ELECTRON_RENDERER_URL"]
         ? win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/notification-pill.html`)
         : win.loadFile(join(import.meta.dirname, "../renderer/notification-pill.html")),
+    // The answer panel is a second host-less window owned by the same overlay; it is created
+    // lazily on "Show answer" and reuses the pill preload (which also exposes the panel channel).
+    createPanelWindow: () =>
+      new BrowserWindow({
+        width: 520,
+        height: 360,
+        frame: false,
+        transparent: true,
+        show: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        webPreferences: {
+          preload: join(import.meta.dirname, "../preload/notification-pill.cjs"),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      }),
+    loadPanelWindow: (win) =>
+      process.env["ELECTRON_RENDERER_URL"]
+        ? win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/notification-pill-answers.html`)
+        : win.loadFile(join(import.meta.dirname, "../renderer/notification-pill-answers.html")),
   });
   markMainLaunchAppReady();
   installLocalMediaPreviewProtocol(session.defaultSession.protocol, {

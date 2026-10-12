@@ -283,6 +283,17 @@ export type UiThemePreference = UiThemeMode | "auto";
 
 export const DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS = 600_000;
 
+/**
+ * Foreground subagent inactivity watchdog window.
+ *
+ * Deliberately far below {@link DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS}: the watchdog must fire
+ * first, so a child that produces no session event at all (a silently stalled model request,
+ * an admission that never returns, or a tool that never settles) fails fast instead of
+ * idling until the parent turn gives up. Healthy long work keeps resetting the window because
+ * streamed deltas and tool-progress events are session events.
+ */
+export const DEFAULT_SUBAGENT_INACTIVITY_TIMEOUT_MS = 120_000;
+
 export interface ModelStreamConfig {
   idleTimeoutMs: number;
 }

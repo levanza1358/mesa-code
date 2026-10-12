@@ -2,7 +2,7 @@ import {
   conversationArtifactTypeSchema,
   type ConversationArtifactType,
 } from "./mesa-code-protocol-v4/rows.js";
-import { MEDIA_PREVIEW_FORMATS } from "./media-preview.js";
+import { IMAGE_PREVIEW_FORMATS, MEDIA_PREVIEW_FORMATS } from "./media-preview.js";
 
 export type ConversationPreviewFileKind =
   | "markdown"
@@ -11,6 +11,7 @@ export type ConversationPreviewFileKind =
   | "xlsx"
   | "pptx"
   | "pdf"
+  | "image"
   | "video"
   | "audio";
 
@@ -84,6 +85,14 @@ const PREVIEW_FILE_TYPES: readonly PreviewFileTypeDefinition[] = [
     mimeType: "application/pdf",
     artifactType: "pdf",
   },
+  ...IMAGE_PREVIEW_FORMATS.map(
+    ({ extension, mediaType }): PreviewFileTypeDefinition => ({
+      extensions: [extension],
+      kind: "image",
+      mimeType: mediaType,
+      artifactType: "image",
+    }),
+  ),
   ...MEDIA_PREVIEW_FORMATS.map(
     ({ extension, kind, mediaType }): PreviewFileTypeDefinition => ({
       extensions: [extension],
@@ -101,9 +110,9 @@ const FILE_URL_RE = /\bfile:\/\/[^\s<>()\]`"'*，。！？；：、]+/giu;
 const FILE_CITATION_RE = /:{1,2}mesa-code-file-citation\{([^}]*)\}/giu;
 const MARKDOWN_LINK_RE = /\[([^\]\n]*)\]\(([^)\n]+)\)/g;
 const DELIMITED_FILE_PATH_RE =
-  /([`"'])([^`"'\r\n]+?\.(?:md|html?|docx|xlsx|pptx|pdf|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)\1/giu;
+  /([`"'])([^`"'\r\n]+?\.(?:md|html?|docx|xlsx|pptx|pdf|png|jpe?g|gif|webp|avif|bmp|svg|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)\1/giu;
 const FILE_PATH_RE =
-  /(?:^|[\s("'`,.;:!?，。！？；：、])((?:(?:\.{1,2}[\\/]|[a-zA-Z]:[\\/]|\/|[\p{L}\p{N}\p{M}\p{S}_.@()-]+[\\/])[\p{L}\p{N}\p{M}\p{S}_.@() -]+?(?:[\\/][\p{L}\p{N}\p{M}\p{S}_.@() -]+?)*|[\p{L}\p{N}\p{M}\p{S}_.@()-]+)\.(?:md|html?|docx|xlsx|pptx|pdf|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)(?=$|[\s)"'`,.;:!?，。！？；：、])/giu;
+  /(?:^|[\s("'`,.;:!?，。！？；：、])((?:(?:\.{1,2}[\\/]|[a-zA-Z]:[\\/]|\/|[\p{L}\p{N}\p{M}\p{S}_.@()-]+[\\/])[\p{L}\p{N}\p{M}\p{S}_.@() -]+?(?:[\\/][\p{L}\p{N}\p{M}\p{S}_.@() -]+?)*|[\p{L}\p{N}\p{M}\p{S}_.@()-]+)\.(?:md|html?|docx|xlsx|pptx|pdf|png|jpe?g|gif|webp|avif|bmp|svg|mp4|mov|webm|m4v|mp3|wav|m4a|ogg|opus|flac|weba)(?::\d+(?::\d+)?)?)(?=$|[\s)"'`,.;:!?，。！？；：、])/giu;
 
 function normalizeSlashes(path: string): string {
   return path.replace(/\\/gu, "/");

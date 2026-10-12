@@ -10,7 +10,8 @@ type WebThemeSeed =
   | "forest"
   | "purple"
   | "rose"
-  | "amber";
+  | "amber"
+  | "liquid";
 
 export const WEB_DEFAULT_THEME: WebThemeSeed = "zai-dark";
 
@@ -22,6 +23,7 @@ const CATALOGUE_DARK_THEMES = [
   "purple",
   "rose",
   "amber",
+  "liquid",
 ] as const;
 
 function isWebThemeSeed(value: unknown): value is WebThemeSeed {

@@ -132,6 +132,7 @@
 }
 
 .quiet-studio-conversation .chat-composer-input-surface {
+  position: relative;
   border: 1px solid var(--color-input-border);
   border-radius: 14px;
   background: var(--color-panel);
@@ -142,6 +143,91 @@
   border-color: var(--color-input-border-focused);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 16%, transparent);
 }
+
+/* ---------------------------------------------------------------------------
+   Running-response glow.
+
+   While a response is running the composer border carries a slow travelling
+   highlight, so "the agent is working" reads at a glance without a spinner
+   competing with the streaming text.
+
+   The effect is a conic gradient rotated by an animated custom property. The
+   border itself is drawn by a pseudo-element rather than the real border, so
+   the neutral border token stays intact underneath and nothing shifts when the
+   run ends.
+
+   Design-system fit: DESIGN.md says inputs should not glow *by default* and that
+   motion should clarify state change rather than decorate. This runs only in the
+   active-response state, uses the existing brand token, and is disabled under
+   prefers-reduced-motion.
+--------------------------------------------------------------------------- */
+@keyframes quiet-studio-composer-glow-spin {
+  to {
+    /* Registered angle rather than a background sweep: the gradient stays smooth
+       and only the angle interpolates, which avoids banding on long borders. */
+    --quiet-studio-composer-glow-angle: 360deg;
+  }
+}
+
+@keyframes quiet-studio-composer-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@property --quiet-studio-composer-glow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* The travelling-ring layer.
+   It is painted as a top overlay (z-index 1) rather than beneath the content.
+   An earlier revision put it at z-index 0 and lifted the composer's children to
+   z-index 1 so text stayed readable — but that also raised any child with an
+   opaque background (the editor wrapper, the toolbar row) above the ring, so the
+   glow vanished wherever content covered the border, including whenever the
+   pointer moved into the box. Painting the ring on top and making it
+   pointer-transparent keeps it visible over every child without affecting
+   interaction or text. */
+.quiet-studio-conversation [data-composer-running="true"] .chat-composer-input-surface::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 1;
+  background: conic-gradient(
+    from var(--quiet-studio-composer-glow-angle),
+    transparent 0deg,
+    transparent 210deg,
+    color-mix(in srgb, var(--color-brand) 45%, transparent) 275deg,
+    var(--color-brand) 320deg,
+    color-mix(in srgb, var(--color-brand) 45%, transparent) 355deg,
+    transparent 360deg
+  );
+  /* Mask the gradient into a 1px ring so only the outline glows. */
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation:
+    quiet-studio-composer-glow-spin 2.4s linear infinite,
+    quiet-studio-composer-glow-pulse 2.4s ease-in-out infinite;
+}
+
+/* The ring paints above the content, so children need no z-index raising:
+   keeping them in the normal flow avoids stacking surprises and leaves text,
+   toolbar hit areas and the editor untouched. */
 
 /* The queued sheet renders above the composer and tucks under it (-mb-7/pb-7), so the two must
    read as one surface. It mirrors the composer's border token and fill and drops its bottom
@@ -179,6 +265,59 @@
   flex-shrink: 1;
 }
 
+/* Phone-width composer row: one tidy row (mobile web layout spec rule 15).
+   The row used to wrap because the leading cluster took a 20rem flex basis that
+   never shrank below the row width, pushing the model cluster + send onto a
+   second line; the JS fitter then collapsed the model chip to an icon. Keep the
+   row on one line, let only the leading cluster shrink, and bound the model chip
+   so a long provider/model name truncates instead of dominating. Gated on the
+   web-only document marker (`html[data-mesa-code-web]`, set by the web entry) so
+   the desktop renderer keeps today's wrapping layout at every window width,
+   however narrow — a bare max-width query would otherwise reach a narrow desktop
+   window (the desktop minimum is 480px). */
+@media (max-width: 767px) {
+  html[data-mesa-code-web] .quiet-studio-composer-editor > [class~="group/toolbar"] {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  html[data-mesa-code-web] .quiet-studio-composer-editor [data-composer-leading-actions] {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  html[data-mesa-code-web] .quiet-studio-composer-editor [data-composer-leading-content] {
+    flex-wrap: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  /* The project + Git-branch chip group is inside the leading cluster and used to
+     wrap internally (branch stacked under the project), which is what made the
+     row read as two lines. Keep it on one line and let its chips truncate. The
+     chips are base `Button`s, which are `shrink-0`, so their freeze is undone
+     here and a small min-width keeps a legible label rather than a single
+     character. */
+  html[data-mesa-code-web] .quiet-studio-composer-editor [data-composer-project] {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  html[data-mesa-code-web] .quiet-studio-composer-editor [data-composer-project] > *,
+  html[data-mesa-code-web] .quiet-studio-composer-editor [data-composer-project] button {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  html[data-mesa-code-web] .quiet-studio-composer-editor [data-composer-project] button {
+    min-width: 2.5rem;
+  }
+
+  html[data-mesa-code-web] .quiet-studio-composer-editor .composer-model-trigger {
+    max-width: 8.5rem;
+  }
+}
+
 .quiet-studio-appearance [data-slot="select-trigger"] {
   width: 100%;
   max-width: 100%;
@@ -201,9 +340,85 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Liquid theme: liquid glass.
+
+   `.theme-liquid` (styles.css) makes the background-family tokens translucent
+   (roughly 30-50% color) so the native window material reads through and tints the
+   glass: macOS uses `vibrancy: "under-window"` and Windows uses
+   `backgroundMaterial: "acrylic"`, both enabled in desktopWindowChrome.ts over a
+   transparent BrowserWindow. This is the standard macOS/iOS liquid glass — no
+   in-window wallpaper, just translucent surfaces over the real window material.
+
+   These rules add renderer-side frost where a surface actually stacks over other
+   content: floating overlays (menus, popovers, dialogs, tooltips) and the mobile
+   web sidebar drawer. Web additionally gets a colorful ambient backdrop (below),
+   because a plain white page behind the translucent glass would read as a
+   washed-out light theme — the translucency only reads as glass when there is
+   something varied behind it.
+
+   A hairline top highlight and soft hairline border give the panes the polished
+   edge of iOS liquid glass. Blur strength lives in the theme block as
+   --mesa-code-glass-blur / --mesa-code-glass-saturate, so every frosted surface
+   stays in step and the intensity is tuned in one place.
+--------------------------------------------------------------------------- */
+html.theme-liquid [data-slot="select-content"],
+html.theme-liquid [data-slot="dropdown-menu-content"],
+html.theme-liquid [data-slot="popover-content"],
+html.theme-liquid [data-slot="context-menu-content"],
+html.theme-liquid [data-slot="hover-card-content"],
+html.theme-liquid [data-slot="dialog-content"],
+html.theme-liquid [data-slot="alert-dialog-content"],
+html.theme-liquid [data-slot="tooltip-content"],
+html.theme-liquid [data-slot="command"] {
+  backdrop-filter: blur(var(--mesa-code-glass-blur)) saturate(var(--mesa-code-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--mesa-code-glass-blur))
+    saturate(var(--mesa-code-glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+    0 12px 40px rgba(0, 0, 0, 0.32);
+}
+
+/* The mobile web sidebar is an off-canvas drawer over the content column, so it
+   genuinely overlaps content and reads as glass when frosted. Desktop and wide
+   web keep the sidebar in flow, where a blur would have nothing behind it. */
+@media (max-width: 767px) {
+  html.theme-liquid[data-mesa-code-web] .quiet-studio-sidebar {
+    backdrop-filter: blur(var(--mesa-code-glass-blur)) saturate(var(--mesa-code-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--mesa-code-glass-blur))
+      saturate(var(--mesa-code-glass-saturate));
+  }
+}
+
+/* Web has no window material to frost, so give the translucent Liquid shell a
+   colorful ambient backdrop to refract through, instead of a flat white canvas.
+   Layered radial glows over a deep base read as the blurred wallpaper behind
+   liquid glass. The shell (data-workspace-shell, background: --color-background
+   at ~30% color) tint-blurs this; floating overlays frost it directly. */
+html.theme-liquid[data-mesa-code-web] {
+  background:
+    radial-gradient(60% 50% at 12% 8%, rgba(60, 220, 180, 0.5), transparent 60%),
+    radial-gradient(50% 45% at 88% 4%, rgba(90, 140, 255, 0.5), transparent 62%),
+    radial-gradient(65% 60% at 78% 96%, rgba(255, 120, 90, 0.42), transparent 60%),
+    radial-gradient(55% 55% at 8% 92%, rgba(190, 110, 255, 0.42), transparent 60%),
+    linear-gradient(160deg, #0a1016, #0d1622 45%, #0a1016) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .quiet-studio-sidebar-frame *,
   .quiet-studio-appearance * {
     transition-duration: 0s !important;
+  }
+
+  /* Replace the travelling glow with a static brand border, so "running" is
+     still visible without any animation. */
+  .quiet-studio-conversation [data-composer-running="true"] .chat-composer-input-surface::before {
+    animation: none;
+    background: none;
+    border: 1px solid var(--color-brand);
+    border-radius: inherit;
+    padding: 0;
+    -webkit-mask: none;
+    mask: none;
   }
 }
