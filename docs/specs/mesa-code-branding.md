@@ -1,8 +1,29 @@
 # Mesa Code Branding
 
-## Status
+**Status:** active  
+**Owner:** repository, UI, and desktop identity maintainers  
+**Authority:** contract  
+**Scope:** product identity, startup presentation, language, and compatibility naming  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; login and storage discrepancies remain below
 
-Implemented
+## Current authority and unresolved differences
+
+[Settings-only navigation and native Git authentication](github-only-login-and-push.md)
+supersedes the login/welcome behavior described in the earlier Anonymous Startup
+section below. Its removal contract is authoritative; the earlier statements that
+explicit application login and expired-session login remain available must not be
+used to restore those surfaces.
+
+This specification and current storage helpers use `.mesaCode` / `.mesaCodeignore`,
+while root workspace guidance names `.mesa-code/` / `.mesa-codeignore` as stable
+identifiers. That disagreement requires maintainer clarification and, if behavior
+changes, an explicit idempotent migration. This docs-only review renames neither
+paths nor stored data. Current path spelling is not permission to discard existing
+user data.
+
+Packaging, startup, and language acceptance below remain required outcomes, not
+proof that an installer or runtime passed this review.
 
 ## Purpose
 

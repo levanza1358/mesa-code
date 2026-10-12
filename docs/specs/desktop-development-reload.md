@@ -1,6 +1,11 @@
 # Desktop Development Reload
 
-Status: Implemented
+**Status:** active  
+**Owner:** desktop main-process maintainers  
+**Authority:** contract  
+**Scope:** development-only renderer reload without restarting the Host or Agent  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; no desktop launch or reload was performed
 
 ## Product behavior
 

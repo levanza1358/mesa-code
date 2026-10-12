@@ -4,7 +4,8 @@
 **Owner:** skills service and Settings maintainers  
 **Authority:** skill discovery, enablement, and import vocabulary  
 **Scope:** local, user, plugin, and imported Agent Skills  
-**Updated:** 2026-10-09 16:31 (local time)
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only review; no catalog import or runtime discovery was performed
 
 Read the [documentation index](../README.md) first. Read the active skill/subagent specifications for model execution behavior; this document owns catalog and Settings terminology only.
 
@@ -18,7 +19,19 @@ Mesa Code discovers local, user, plugin, and imported Agent Skills. Imported ski
 
 ## Import boundary
 
-Public skill repositories are imported into the workspace `.agents/skills` directory. Import is explicit and does not auto-enable skills. Imported `SKILL.md` files are treated as instructions, not executable code; bundled scripts still require normal tool permissions.
+Workspace-authored or explicitly copied public skills may live under `.agents/skills`.
+The intended import rule remains: import is explicit and does not auto-enable skills.
+This document does not establish that a dedicated repository-import command or UI exists.
+Review external instructions and bundled scripts before adding them; normal tool
+permissions still apply when a loaded skill asks to execute scripts.
+
+Current `skillsService.ts` attaches enabled state by normalized skill path and defaults
+an entry without a saved preference to `true`. Consequently, copying a newly discovered
+skill is **not** guaranteed to leave it disabled. The intended disabled-by-default
+import rule is not established by that discovery path; it needs an explicit
+import/enablement decision, not a claim that the source already enforces it.
+Plugin enablement and uninstall suppression remain owned by the plugin lifecycle; see
+[builtin productivity skills](../specs/builtin-productivity-skills.md).
 
 ## Acceptance
 

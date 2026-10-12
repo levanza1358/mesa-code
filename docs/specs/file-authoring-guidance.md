@@ -1,14 +1,20 @@
 # File authoring guidance
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI tool-description and context maintainers  
+**Authority:** contract  
+**Scope:** direct plain-text authoring versus generator-produced binary artifacts  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; no artifact generation was run
 
 ## Problem
 
 The agent refused to create plain-text files such as `.csv` when the request was not a
 coding task, claiming the tool could not do it. The refusal was wrong: the `Write` tool
-accepts any text content and performs no extension validation; the path policy does not
-block paths outside the workspace root. Only the `Read` tool has a binary-extension
-denylist, and it does not include `.csv`.
+accepts text content without restricting it to source-code extensions. Path and permission
+policies still apply: [Workspace only](workspace-only-mode.md) rejects outside-workspace
+file-tool paths when enabled. The `Read` tool has separate dispatch and binary-format
+rules, including the [Office reader](office-document-read.md) for `.csv` and workbooks.
 
 The real gap is in guidance, not capability:
 

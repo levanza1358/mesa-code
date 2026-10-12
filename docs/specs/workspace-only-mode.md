@@ -1,120 +1,124 @@
-# Workspace only 权限边界
+# Workspace only permission boundary
 
-## 一句话
+**Status:** active  
+**Owner:** CLI execution-state, path-policy, and composer maintainers  
+**Authority:** contract  
+**Scope:** workspace confinement independent of permission mode and plan state  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only review; filesystem containment limitations remain below
 
-「Workspace only」是叠加在三种权限模式之上的**边界开关**，不是第四种权限模式。
-开启后，会话只允许在当前 workspace 内作业；关闭后，只有在用户明确要求时才允许越界。
+## Product rules
 
-## 位置
+Workspace only is a boundary toggle layered over the permission modes, not a
+fourth mode. When enabled, work must stay inside the current workspace. When
+disabled, access outside the workspace still requires an explicit user request
+and the applicable permissions.
 
-- UI：聊天工具栏左下角的模式选择器（`V4ComposerModeSwitch`）展开菜单，位于三种权限单选之下、
-  用分隔线隔开的切换行。Plan 勾选项之上是权限单选，分隔线之下是 Workspace only。
-- 命令面（legacy，非 v4）：`session/setMode` 的 `workspaceOnly` 可选字段。
-- v4 协议：`SessionConfigState.workspaceOnly`、`createSession.config.workspaceOnly`、
-  `firstInput.workspaceOnly`、`sendText.workspaceOnly`、`sendGoalCommand.workspaceOnly`。
+- The composer mode menu (`V4ComposerModeSwitch`) places the toggle below the
+  permission choices, separated from them.
+- Legacy `session/setMode` accepts optional `workspaceOnly`.
+- V4 carries it through `SessionConfigState.workspaceOnly`,
+  `createSession.config.workspaceOnly`, `firstInput.workspaceOnly`,
+  `sendText.workspaceOnly`, and `sendGoalCommand.workspaceOnly`.
 
-## 与 mode / planEnabled 的关系
-
-三者**正交**：
-
-| 维度 | 取值 | 语义 |
+| Dimension | Values | Meaning |
 | --- | --- | --- |
-| `mode` | `build` / `edit` / `yolo`（+ 内部 `auto`） | 每次工具调用的确认策略 |
-| `planEnabled` | `true` / `false` | 是否处于 Plan 阶段（只调研、不落地） |
-| `workspaceOnly` | `true` / `false` | 是否把会话限制在 workspace 内 |
+| `mode` | `build`, `edit`, `yolo` (internal `auto`) | Tool approval policy |
+| `planEnabled` | boolean | Research/plan phase rather than implementation |
+| `workspaceOnly` | boolean | Workspace path boundary |
 
-因此：
+All three dimensions are independent. Full Access (`yolo`) changes approval;
+it does not remove Workspace only. Plan and Workspace only do not toggle each
+other. The default is **off**, preserving existing outside-workspace behavior:
+`executionStateSchema` defaults to `false`, and `resolveExecutionState()` uses
+`input.workspaceOnly ?? current.workspaceOnly ?? false`. Old session snapshots
+may omit the optional field.
 
-- Workspace only 对 **build / edit / yolo 三种权限模式全部生效**，不是只对 Full Access。
-- Plan 勾选与 Workspace only 互不影响。
-- 「Full access」= `yolo`，它只意味着**不再逐次确认**；Workspace only 仍然约束它能碰哪些路径。
+## File-tool boundary
 
-## 默认值
+[`resolveWorkspacePath()`](../../apps/mesa-code-cli/packages/core/src/tool/path-policy.ts)
+normalizes/resolves an absolute path and checks `isPathInsideWorkspace()` when
+the toggle is on. Outside paths throw before permission approval, with
+`reason: "workspace_only"`. This applies to tools using that resolver, including
+Read, Write, Edit, Glob, Grep, and NotebookEdit.
 
-**默认 OFF**，保持仓库原有的「允许访问 workspace 之外路径」行为不变。
-只有用户显式打开才会进入约束状态。默认值同时影响：
+The current predicate permits the root itself or a relative result that does not
+start with `..` and is not absolute. This is **lexical containment**, not proof of
+filesystem confinement: the resolver does not canonicalize symlinks/junctions
+with `realpath`. The specification's intended inside-workspace guarantee remains;
+symlink/junction traversal requires a separate implementation/security decision.
+Do not advertise the current check as an OS sandbox or a verified hard security
+boundary. The prefix check can also reject an in-root name beginning with `..`;
+that is a source limitation, not a new product prohibition.
 
-- `executionStateSchema.workspaceOnly`（`.default(false)`）
-- `resolveExecutionState()`（`input.workspaceOnly ?? current.workspaceOnly ?? false`）
-- `SessionConfigState.workspaceOnly`（`optional`，旧快照无该字段时解析为未设置）
+## Bash guardrail, not a sandbox
 
-## 强制程度：文件工具 = 硬边界，Bash = 尽力护栏
+The OS-level Bash sandbox is absent from the current execution path.
+`ExecutionSandboxPolicy` remains a contract type, but its existence does not prove
+an enforcing adapter. Bash confinement is best-effort:
 
-### 文件工具（硬边界，可依赖）
+1. `resolveBashWorkspaceCwd()` pins the initial cwd to the workspace root.
+2. `resolveBashWorkspaceOnlyViolation()` checks path-shaped absolute tokens and
+   rejects those resolving outside the root; absolute paths inside it are allowed
+   by the current helper. It also rejects `..` path segments.
 
-`resolveWorkspacePath()`（`core/src/tool/path-policy.ts`）在 `workspaceOnly === true` 时，
-对**解析后的绝对路径**做 `isPathInsideWorkspace()` 判定，越界直接抛错，不进入
-权限确认流程，也没有任何绕过路径。覆盖的工具：
+The owner is
+[`bash-workspace-only.ts`](../../apps/mesa-code-cli/packages/core/src/tool/handlers/bash-workspace-only.ts).
+Interpreters, downloaded executables, environment-variable construction, and other
+indirection can bypass a command-text check. Strong confinement would require an
+OS-level mechanism, not more regex claims.
 
-`Read`、`Write`、`Edit`、`Glob`、`Grep`、`NotebookEdit` 等所有经过
-`resolveWorkspacePath` / `resolveToolWorkingDirectory` 的路径解析。
+## Prompt guidance
 
-判定规则：`candidate` 等于 workspace root，或 `relative(root, candidate)` 不以 `..` 开头
-且不是绝对路径 → 允许；否则拒绝。错误消息里带 `reason: "workspace_only"`，便于日志聚类。
+`WORKSPACE_ONLY_REMINDER` / `buildWorkspaceOnlyReminderBody` in
+`apps/mesa-code-cli/packages/core/src/runtime/helpers/runtime-reminders.ts` tells
+the model to treat the workspace root as its filesystem boundary, avoid external
+paths, and ask the user to turn off Workspace only when external files are needed.
+This shapes planning but grants no permissions and proves no model compliance.
 
-### Bash（尽力护栏，**不是**安全边界）
+## Owners and event order
 
-本仓库的 **OS 级 Bash sandbox 已被移除**：`ExecutionSandboxPolicy` 仍留在
-`contracts/src/interfaces/execution.port.ts`，但没有任何 adapter 读取它，
-`node-execution-adapter-run.ts` 里有注释说明「sandbox 撤除后」。
-因此 Bash 无法像文件工具那样给出强保证。
+```text
+Composer toggle -> V4ComposerDraft.workspaceOnly (session-scoped local draft)
+  -> submission freezes ComposerSubmissionConfig.workspaceOnly
+  -> command/queue item/conversationInputIntent
+  -> applySubmissionExecutionState -> applyRuntimeExecutionState
+  -> runtime.config + SESSION_ENTRY_EXECUTION_STATE + SessionModeChanged
+  -> tool context.sessionModePort.isWorkspaceOnly()
 
-`bash-workspace-only.ts` 做两件诚实的事：
+Cold restore -> transcript-hydration intent -> runtime execution state
+  -> v4-bridge config seed -> product-projection config.workspaceOnly
+  -> state.updated delta -> renderer
+```
 
-1. **固定 cwd**：`resolveBashWorkspaceCwd()` 在开启时把命令的 cwd 钉死在 workspace root，
-   相对路径不会静默解析到外面。
-2. **拦截明显越界**：`resolveBashWorkspaceOnlyViolation()` 拒绝
-   - 命令中出现的绝对路径（`/x`、`C:\x`、`\\server\share` 等，正则为 `ABSOLUTE_PATH_PATTERN`）；
-   - `..` 作为路径段出现（`cd ..`、`cat ../x`）——即便不是绝对路径，cwd 钉在根之后
-     仍可能越界。
+The composer owns only the uncommitted draft; the runtime owns applied execution
+state. CommandInbox admission and remote identity rules remain unchanged. No
+second durable owner is introduced.
 
-**已知且被接受的限制**：通过间接手段（解释器一行命令、下载的可执行文件、环境变量拼接
-路径等）仍可逃出。这是为什么本特性在提示词里就明确声明规则，并把 Bash 侧检查
-描述为「护栏」而不是「沙箱」。若要升级为硬保证，需要把 OS sandbox 重新引入。
+## Verification scenarios
 
-### 提示词（先验约束）
+- Enable Workspace only under each permission mode; confirm an outside file-tool
+  path fails without an approval bypass, and the workspace root remains valid.
+- Toggle Plan independently; confirm neither setting changes the other.
+- Submit, queue, restore, and replay the execution state through the same owner.
+- Check Bash cwd, outside absolute paths, parent traversal, and inside absolute
+  paths against the helper's actual behavior; do not claim interpreter isolation.
+- Exercise symlinks/junctions separately before claiming filesystem confinement.
 
-开启时，每一轮都会注入系统提醒 `workspace_only`（`runtime-reminders.ts`
-的 `WORKSPACE_ONLY_REMINDER` / `buildWorkspaceOnlyReminderBody`），
-明确告诉模型：把 workspace root 当作整个文件系统，不要尝试绝对路径、`..`、
-用户 home 目录，需要外部文件时**停下来请用户关闭 Workspace only**。
+Existing focused check:
+`pnpm exec tsx --test apps/mesa-code-cli/packages/core/test/workspace-only-policy.test.ts`.
+It was not run for this documentation review; lexical path tests alone do not
+prove symlink confinement or a launched session's behavior.
 
-这样做的目的：让约束在模型**规划阶段**就生效，而不是等它撞上被拒绝的工具调用。
-用户在需求里明确要求「开启时模型不应该想到要出去做」。
+## Source map
 
-## 状态流转
-
-1. UI 在模式菜单里切换 → 只写 Composer 草稿（`V4ComposerDraft.workspaceOnly`），
-   与 mode / planEnabled 同一层级，随 session scope 持久化到 localStorage。
-2. 提交（`sendText` / `sendGoalCommand` / `createSession.firstInput`）时，
-   `composerSubmissionConfig` 冻结成 `ComposerSubmissionConfig.workspaceOnly`，
-   随 Submission 一起进 command / queue item / `conversationInputIntent`。
-3. runtime 在 `applySubmissionExecutionState` 里发现 `intent.workspaceOnly !== undefined`
-   就调用 `applyRuntimeExecutionState`，写 `runtime.config.workspaceOnly`、
-   持久化 `SESSION_ENTRY_EXECUTION_STATE`、发布 `SessionModeChanged`
-   （带 `workspaceOnly` / `previousWorkspaceOnly`）。
-4. 工具执行时通过 `context.sessionModePort.isWorkspaceOnly()` 读到当前值。
-5. 冷恢复：`transcript-hydration` 从持久化 intent 还原 `workspaceOnly`；
-   `v4-bridge` 的 config seed 用 `runtime.getWorkspaceOnly()` 初始化投影；
-   `product-projection` 的 `SessionModeChanged` reducer 把 `workspaceOnly` 写进
-   `config.workspaceOnly` 并推送 `state.updated` delta。
-
-## 测试
-
-- `core/test/workspace-only-policy.test.ts`：文件路径硬边界（root 本身、兄弟目录、
-  绝对越界路径、关闭后放行）+ `isPathInsideWorkspace` + Bash 护栏
-  （`..` 拦截、关闭时惰性、纯 workspace 内命令放行）。
-
-## 相关文件
-
-| 关注点 | 文件 |
+| Concern | Repository-relative source |
 | --- | --- |
-| 共享执行状态 | `packages/shared/src/execution-state.ts` |
-| v4 会话配置 | `packages/shared/src/mesa-code-protocol-v4/session-config.ts` |
-| v4 命令载荷 | `packages/shared/src/mesa-code-protocol-v4/command.ts`、`input-intent.ts` |
-| 文件路径硬边界 | `core/src/tool/path-policy.ts` |
-| Bash 护栏 | `core/src/tool/handlers/bash-workspace-only.ts`、`bash.ts` |
-| 提示词 | `core/src/runtime/helpers/runtime-reminders.ts`、`system-reminder/source.ts` |
-| 状态应用 | `core/src/runtime/execution-state.ts`、`methods/turn-model.ts` |
-| 投影 | `bootstrap/src/mesa-code-protocol-v4/product-projection.ts` |
-| UI | `packages/ui/src/v4/composer/V4ComposerModeControls.tsx` |
+| Shared execution state | `packages/shared/src/execution-state.ts` |
+| V4 session configuration | `packages/shared/src/mesa-code-protocol-v4/session-config.ts` |
+| V4 commands and intent | `packages/shared/src/mesa-code-protocol-v4/command.ts`, `input-intent.ts` |
+| File path policy | `apps/mesa-code-cli/packages/core/src/tool/path-policy.ts` |
+| Bash guardrail | `apps/mesa-code-cli/packages/core/src/tool/handlers/bash-workspace-only.ts`, `bash.ts` |
+| Runtime state | `apps/mesa-code-cli/packages/core/src/runtime/execution-state.ts` |
+| Projection | `apps/mesa-code-cli/packages/bootstrap/src/mesa-code-protocol-v4/product-projection.ts` |
+| Composer controls | `packages/ui/src/v4/composer/V4ComposerModeControls.tsx` |

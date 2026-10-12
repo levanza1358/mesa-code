@@ -1,8 +1,13 @@
 # Black Theme
 
-Status: In progress
+**Status:** active  
+**Owner:** UI theme and Appearance maintainers  
+**Authority:** contract  
+**Scope:** Black theme token coverage and accent compatibility  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; visual acceptance remains a separate check
 
-Depends on: `docs/specs/theme-set-reduction.md`, `docs/specs/accent-picker.md`
+Related: [theme catalog](../theme-catalog.md), [accent selection](accent-picker.md). The superseded theme-reduction specification is historical context, not a dependency.
 
 ## Problem
 
@@ -87,5 +92,5 @@ flowchart TB
 
 ## Verification
 
-- `pnpm typecheck`, `pnpm lint`, and `pnpm architecture:check --changed` pass.
-- Black is confirmed visually in the running app, not asserted from the stylesheet.
+- After implementation changes, run `pnpm typecheck`, `pnpm lint`, and `pnpm architecture:check --changed`; record actual results in the [verification log](../verification-log.md).
+- Verify Black visually in an isolated running app. Stylesheet presence does not prove contrast, elevation, or terminal rendering. No runtime check was run for this documentation review.

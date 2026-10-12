@@ -1,8 +1,11 @@
 # Mesa Code Naming
 
-## Status
-
-Implemented
+**Status:** active  
+**Owner:** repository and shared-protocol maintainers  
+**Authority:** contract  
+**Scope:** new file/symbol naming, import spelling, and stable compatibility identifiers  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; naming rules do not certify every existing file
 
 ## Purpose
 
@@ -18,7 +21,7 @@ PascalCase symbols.
   `mesa-code-task-types-core.ts`, `mesa-code-agent-service.ts`,
   `mesa-code-protocol/`, `mesa-code-protocol-v4/`.
 - Ordinary domain modules drop the prefix:
-  `remote-workspace-rpc.ts`, `task-index-repo.ts`, `conversationShare.ts`.
+  `remote-workspace-rpc.ts`, `task-index-repo.ts`, `conversation-share.ts`. Existing camelCase files are not a precedent for new names; this rule does not authorize bulk-renaming compatibility identifiers.
 - Never use `mesa-codeFoo.ts` (hyphen prefix + camelCase suffix) or
   `mesaCodeFoo.ts` (all camelCase).
 - Test files end in `.test.ts`; fixtures live under `test/fixtures/`.

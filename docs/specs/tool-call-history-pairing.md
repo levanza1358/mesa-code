@@ -1,6 +1,11 @@
 # Tool-call history pairing
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI model-adapter maintainers  
+**Authority:** contract  
+**Scope:** request-local, idempotent tool-call/result normalization across provider protocols  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; no provider request was sent
 
 ## Product behavior
 
@@ -22,7 +27,7 @@ the history locally at the logical-request boundary instead of relying on a retr
 
 ## Ownership and boundary
 
-`projectRequestHistory` (`packages/adapters/src/model/runner.ts`) is the single owner of
+`projectRequestHistory` (`apps/mesa-code-cli/packages/adapters/src/model/runner.ts`) is the single owner of
 request-local history projection. It runs once per logical model request, so every
 physical retry attempt reuses the already-normalized history rather than
 re-normalizing a half-repaired copy.

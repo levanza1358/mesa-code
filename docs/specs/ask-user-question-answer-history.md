@@ -1,5 +1,12 @@
 # AskUserQuestion answer history
 
+**Status:** active  
+**Owner:** CLI interaction/projection and UI conversation maintainers  
+**Authority:** contract  
+**Scope:** accepted structured answers in live, replayable, and restored tool rows  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; cold-restart limitation remains below
+
 ## Product rules
 
 A completed AskUserQuestion card displays the user's submitted answers for each question. Partial submissions leave only genuinely unanswered questions marked as unanswered. An explicit empty answer map retains the existing automatic-continue presentation. Declined or cancelled requests must not manufacture answers.

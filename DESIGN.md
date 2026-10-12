@@ -1,10 +1,16 @@
 # Mesa Code Design System
 
+**Status:** active design reference  
+**Owner:** shared UI maintainers  
+**Authority:** presentation and accessibility constraints  
+**Scope:** shared desktop/web UI, typography, themes, and component usage  
+**Updated:** 2026-10-12 08:37 (local time)
+
 Portable design system for AI-assisted UI work in the Mesa Code Quiet Studio project.
 
 ## Quiet Studio: staged presentation contract
 
-[Stage-1 spec](docs/specs/quiet-studio.md) defines required behavior; it is not a completion report. Scope: shell, sidebar, conversation, and Appearance. Backend, tools, plugins, settings outside Appearance, and protocol behavior remain intact. The visual concept is reference material, never a source of fake runtime state.
+[Stage 1](docs/specs/quiet-studio.md) defines shell, sidebar, conversation, and Appearance requirements, not completion. Backend, tools, plugins, and protocol boundaries remain intact. Separately authorized work follows its own contracts: [Settings restructure](docs/specs/settings-restructure.md), [Notifications and Sound](docs/specs/notification-settings.md), [provider Apply/Test](docs/specs/custom-provider-connection-apply-and-test.md), [Liquid](docs/specs/liquid-theme.md), and [mobile web layout](docs/specs/quiet-studio-mobile-web-layout.md). The visual concept never supplies fake runtime state; use the [specification catalog](docs/specs/README.md) for scope.
 
 - Desktop: one resizable sidebar, one product identity, primary New task action, and no parallel icon rail. Keep one Settings action in the footer; no Connect, profile, or account login menu, central conversation, and existing composer. Preserve sidebar collapse, native title-bar drag regions, and control hit areas.
 - Mobile web: retain existing sidebar controls without an extra rail, safe input sizing, and readable composer without horizontal overflow.
@@ -44,7 +50,7 @@ Design for:
 - desktop and web parity
 - macOS, Windows, and Linux compatibility
 - internationalization and variable text length
-- All ten app themes: System, Zai Light, Zai Dark, Black, Midnight, Ocean, Forest, Purple, Rose, and Amber
+- All eleven app themes: System, Zai Light, Zai Dark, Black, Midnight, Ocean, Forest, Purple, Rose, Amber, and Liquid
 - independent accent palettes using semantic color tokens
 
 The Quiet Studio catalog is defined by the current source and stage-1 spec. Legacy
@@ -73,8 +79,11 @@ User-facing theme choices are:
 - Purple
 - Rose
 - Amber
+- Liquid
 
 Default light and dark CSS variables remain fallback foundations. New UI must use semantic tokens and remain readable across every supported choice.
+
+Liquid is the opt-in translucent theme. Source combines background-family tokens with existing macOS vibrancy/Windows acrylic, floating-overlay `backdrop-filter` frost, and a web ambient backdrop. Appearance exposes a Liquid-only "Glass transparency" slider through `--liquid-opacity`; elevated surfaces retain bounded opacity offsets. It is never the default, adds no animation, and blurs no in-flow shell region. This exception does not relax the default UI's gradient rule. Other themes retain opaque base surfaces. See the [theme catalog](docs/theme-catalog.md) for ownership and compatibility; native material appearance, contrast, and live slider visuals remain unverified in the running app.
 
 ## Color Palette
 
@@ -487,7 +496,7 @@ Overlay rules:
 
 ## Elevation and Depth
 
-MesaCode should use restrained depth. Layer primarily through background contrast, borders, and radius before relying on heavy shadows.
+Mesa Code should use restrained depth. Layer primarily through background contrast, borders, and radius before relying on heavy shadows.
 
 Recommended elevation levels:
 

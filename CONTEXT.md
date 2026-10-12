@@ -1,5 +1,15 @@
 # Mesa Code Plugin Store
 
+**Status:** reference  
+**Owner:** plugin-store maintainers  
+**Scope:** plugin marketplace vocabulary; not runtime verification  
+**Updated:** 2026-10-12 08:31 (local time)
+
+Read [`docs/skills/catalog-and-controls.md`](docs/skills/catalog-and-controls.md) for skill controls and
+[`docs/specs/settings-restructure.md`](docs/specs/settings-restructure.md) for the Settings navigation
+contract and current implementation gaps. The terminology below does not establish that every
+lifecycle scenario has passed.
+
 A domain vocabulary for the plugin settings page and its marketplace browse/install experience. This file defines store terminology centrally for pages, services, and documentation.
 
 ## Language

@@ -4,7 +4,7 @@
 **Owner:** release and desktop maintainers  
 **Authority:** release procedure and artifact contract  
 **Scope:** Windows x64 installer publication from an approved Git push  
-**Updated:** 2026-10-09 16:39 (local time)  
+**Updated:** 2026-10-12 08:39 (local time)  
 **Verification:** workflow source review; hosted-run evidence is recorded separately in [`../verification-log.md`](../verification-log.md)
 
 ## Product rule
@@ -46,6 +46,19 @@ The release attaches the installer and any matching updater metadata generated b
 - `.github/workflows/windows-release.yml` owns CI sequencing, release identity, and publication.
 - GitHub Actions owns the temporary runner workspace and release upload.
 - Native Git credentials remain outside this application and workflow contract.
+
+## Source review limits
+
+The workflow currently pins pnpm `10.33.2` directly in `pnpm/action-setup`, rather
+than reading the root `packageManager` field. Those values currently agree, but
+acceptance scenario 2's single-version-source requirement is not enforced by that
+workflow. Node is selected as major `24`, whereas local development pins
+`24.14.0` in `mise.toml`. No hosted workflow, release upload, or installer build
+was run in this documentation review.
+
+The workflow derives release version from the produced installer filename; it
+does not run `build:installer` or bump the root version. Its commit-qualified tag
+is separate from the local [installer version scheme](installer-version-scheme.md).
 
 ## Acceptance scenarios
 

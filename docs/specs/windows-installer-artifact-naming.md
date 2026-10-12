@@ -1,5 +1,12 @@
 # Windows installer artifact naming
 
+**Status:** active  
+**Owner:** desktop packaging maintainers  
+**Authority:** contract  
+**Scope:** production Windows NSIS artifact filename and identity  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; no installer was built
+
 ## Product rule
 
 The Windows NSIS installer built through `build-installer.bat` is a production-identity Mesa Code artifact. Its filename must be exactly:

@@ -4,8 +4,8 @@
 **Owner:** Quiet Studio UI and platform maintainers  
 **Authority:** product contract and acceptance scenarios  
 **Scope:** Stage 1 shell, sidebar, chat, task-list presentation, and Appearance  
-**Updated:** 2026-10-09 16:31 (local time)  
-**Verification:** requirements and source alignment; runtime verification is tracked separately in [`../verification-log.md`](../verification-log.md)
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source review only in this update; known integration gaps below; runtime evidence is tracked separately in [`../verification-log.md`](../verification-log.md)
 
 This document defines intended behavior. It does not by itself prove implementation, runtime smoothness, packaging, or installer behavior. Read [`../README.md`](../README.md), [`../quiet-studio/architecture-and-scope.md`](../quiet-studio/architecture-and-scope.md), and [`../../DESIGN.md`](../../DESIGN.md) for routing and ownership.
 
@@ -13,19 +13,19 @@ This document defines intended behavior. It does not by itself prove implementat
 
 Mesa Code keeps its actual backend, commands, workspaces, tools, settings, and agent runtime. Quiet Studio changes only the shared shell, sidebar, conversation, and Appearance presentation. The HTML concept is a visual reference, never a runtime or source of fake conversations. Plugin/catalog pages and protocol behavior are out of scope.
 
-The checked-out theme catalog is System, Zai Light, Zai Dark, Black, Midnight, Ocean, Forest, Purple, Rose, and Amber — all ten are selectable. Every theme defines a full surface token set. Independent accent selection uses six renamed options: Jade (default), Sky, Violet, Rose, Amber, Coral. Dark surfaces use muted studio green, light surfaces warm paper, Black remains black, and each catalogue theme has its own tinted surface palette. A density preference (comfortable / compact) adjusts interface spacing.
+The checked-out theme catalog is System, Zai Light, Zai Dark, Black, Midnight, Ocean, Forest, Purple, Rose, Amber, and Liquid — all eleven are selectable. Every theme defines a full surface token set. Independent accent selection uses six renamed options: Jade (default), Sky, Violet, Rose, Amber, Coral. Dark surfaces use muted studio green, light surfaces warm paper, Black remains black, and each catalogue theme has its own tinted surface palette. Liquid is a strongly translucent liquid-glass dark theme whose background-family tokens are translucent so macOS vibrancy and Windows acrylic read through, with renderer `backdrop-filter` frost scoped to floating overlays and the mobile drawer and a colorful ambient backdrop on web; a "Glass transparency" slider (shown only for Liquid) adjusts the glass strength; see [`liquid-theme.md`](liquid-theme.md). A density preference (comfortable / compact) adjusts interface spacing.
 
 Desktop navigation uses one sidebar, without a parallel icon rail. One Mesa Code identity heads the sidebar; New task is the primary action, followed by one Search action and one Automations action. A single Settings action occupies the footer, with Appearance available through Settings rather than another navigation button. The outermost desktop/web shell paints one semantic border around the full window surface; internal panel borders remain separate layout dividers. Group/Project grouping, filters, history navigation, and workspace content retain their existing handlers. Sidebar content stays available, resizable, keyboard accessible, and workspace scoped. Existing collapse and small-screen sidebar controls remain available; collapsed navigation must not show a second copy beside the expanded sidebar. Conversation scrolling, virtualization, composition, attachment handling, and keyboard submission remain unchanged. Presentation hooks must not change measured row heights after layout or impose a second scroll container.
 
 ## Shared sidebar presentation
 
-Workspace is the visual reference for Workspace and Settings sidebars: use the same sidebar surface, right divider, 48px header band, 8px horizontal inset, rounded-lg rows, and existing bottom Settings-only footer. Settings retains its Back action and section menu; Windows Settings displays the Mesa Code identity alongside its logo. Both surfaces use one `quiet-studio-nav-selected` style with accent background and an inset brand-colored left marker. New task remains a primary action, not a selection. Existing tab/session stores and Settings section state remain the owners; no new navigation state or persistence is introduced.
+Workspace is the visual reference for Workspace and Settings sidebars: use the same sidebar surface, right divider, 48px header band, 8px horizontal inset, rounded-lg rows, and existing bottom Settings-only footer. Settings retains its Back action and section menu; Windows Settings displays the Mesa Code identity alongside its logo. Both surfaces use one `quiet-studio-nav-selected` style with accent background and an inset brand-colored left marker. New task remains a primary action, not a selection. The Settings navigation keeps one fixed readable column at every window width: group titles and section names stay visible and truncate with an ellipsis when space is short, it never collapses into an icon-only rail, and its bottom Settings-only footer stays visible. Existing tab/session stores and Settings section state remain the owners; no new navigation state or persistence is introduced.
 
 Acceptance scenarios:
 
 1. Opening Settings preserves sidebar width and matches Workspace background, divider, row corners, and footer positioning across themes.
 2. Selecting a task, archived task, Automations, or Settings section displays the same active marker. Existing navigation handlers, remote statuses, drag indicators, and keyboard focus remain intact.
-3. Narrow Settings retains icon-only navigation; long labels truncate. Returning to Workspace preserves existing task selection and drafts. Runtime interaction checks are reported separately from source checks.
+3. Narrow Settings keeps group titles and section names visible in one fixed-width navigation column, truncating long labels rather than hiding them; it does not collapse into an icon-only rail, and the Settings-only footer stays visible. Returning to Workspace preserves existing task selection and drafts. Runtime interaction checks are reported separately from source checks.
 4. Task-list revalidation keeps the last committed workspace snapshot visible while activity, membership, or remote-session data refreshes. The empty state appears only after a confirmed empty result or first-load completion, never as a transient stale-cache frame.
 5. Opening or streaming a task, creating/archiving/pinning it, and reconnecting a remote workspace preserve the visible task snapshot until the authoritative replacement arrives. Existing task-list stores and service subscriptions remain the owners; no polling, timer, persistence, or second cache is introduced.
 
@@ -76,7 +76,7 @@ Acceptance scenarios:
 
 Every user-visible string that Quiet Studio renders is English. The renderer already resolves `zh-CN` and `en-US` to the same `en-US` catalogue, so translated UI text is presentation and must stay English. Presentation-layer labels that are not translated catalogue entries — using a display name that comes from Desktop Main or another injected source — are held to the same rule, because the presentation layer renders them verbatim and cannot translate them.
 
-Display names that cross the Main/UI boundary (for example an installed editor's menu label) are English in the Main-side definition. A localized value such as `资源管理器` leaks the source language straight into an English-only menu because no catalogue lookup happens on the render path. English values match the existing catalogue wording and the macOS counterpart (`Finder`).
+Display names that cross the Main/UI boundary (for example an installed editor's menu label) are English in the Main-side definition. A localized Chinese file-manager label leaks the source language straight into an English-only menu because no catalogue lookup happens on the render path. English values match the existing catalogue wording and the macOS counterpart (`Finder`).
 
 English is the rule for product UI only. User data, workspace paths, and existing stable protocol/storage identifiers are never rewritten.
 
@@ -84,7 +84,7 @@ The application locale is a single owner maintained by Desktop Main (`currentApp
 
 Acceptance scenarios:
 
-1. The "Open in Editor" list names each entry in English; the Windows file-manager entry reads `File Explorer`, not `资源管理器`, and matches the macOS `Finder` precedent.
+1. The "Open in Editor" list names each entry in English; the Windows file-manager entry reads `File Explorer`, not a localized Chinese label, and matches the macOS `Finder` precedent.
 2. No presentation surface renders a source-language label produced by a Main-side display name; such definitions are authored in English at the point of definition.
 3. The native application menu, text context menu, tray, and auto-update menu labels render in English even when the OS preferred language is Chinese.
 4. The About dialog, quit-confirmation dialog, external-workspace confirmation, force-update prompt, and architecture-mismatch prompt render in English on a Chinese-language OS.
@@ -117,7 +117,7 @@ No new network calls, timeouts, routing paths, business data writes, idempotency
 
 Appearance groups app theme, accent, interface font size, and density in a padded card, separate from code settings and code previews. Controls use consistent widths and wrap below their labels on narrow screens. The live app preview represents the current single-sidebar layout, not a removed navigation rail. Existing localized labels and controls remain; no preference or setting is removed.
 
-All ten catalog selections must apply distinct semantic surface palettes immediately and retain the selected value after reload. System follows OS light/dark changes. Legacy `light` and `dark` normalize to Zai Light/Zai Dark, but Midnight, Ocean, Forest, Purple, Rose, and Amber must not silently normalize to Zai Dark. Existing Zustand setters, persistence, and guarded broadcasts remain the sole preference write path; this change adds no store, migration, or server write path. Accent stays independent; code themes and terminal/font ownership remain unchanged.
+All eleven catalog selections must apply distinct semantic surface palettes immediately and retain the selected value after reload. System follows OS light/dark changes. Legacy `light` and `dark` normalize to Zai Light/Zai Dark, but Midnight, Ocean, Forest, Purple, Rose, Amber, and Liquid must not silently normalize to Zai Dark. Existing Zustand setters, persistence, and guarded broadcasts remain the sole preference write path; this change adds no store, migration, or server write path. Accent stays independent; code themes and terminal/font ownership remain unchanged. Liquid is a selectable catalogue entry, not the default: selecting it makes the background-family tokens strongly translucent so the backdrop (window material, or the web ambient glows) visibly tints the surfaces, with `backdrop-filter` frost scoped to stacked surfaces rather than every element; it must read as glass, not as a flat dark theme resembling Midnight.
 
 Acceptance scenarios:
 
@@ -125,10 +125,11 @@ Acceptance scenarios:
 2. Reload after each selection: selected theme and surface palette remain. System responds to OS color-scheme changes; legacy aliases remain compatible.
 3. App and code settings have padded readable rows, aligned controls, and no horizontal overflow at narrow widths. Preview shows one sidebar.
 4. Code themes, interface font size, density, and accent retain their existing handlers and persistence rules.
+5. Selecting Liquid applies the `theme-liquid` class with translucent background-family tokens and opaque foreground/border tokens, keeps the chosen accent, persists across reload, and does not blur in-flow shell regions. Frosted appearance on macOS vibrancy / Windows acrylic is a runtime result reported separately from source checks.
 
 ## Adaptive code colors
 
-Code settings offer an explicit Follow app theme choice for each light/dark code preference, alongside curated built-in syntax themes. Adaptive code colors use the existing app surface and foreground palette and the selected accent for selected syntax roles, while keeping keywords, strings, numbers, and comments distinguishable. All ten app themes and all six accents are supported. Light and dark previews show their respective surface modes; the active preview matches the current app theme. Manual built-in themes retain their original palette and do not silently become adaptive.
+Code settings offer an explicit Follow app theme choice for each light/dark code preference, alongside curated built-in syntax themes. Adaptive code colors use the existing app surface and foreground palette and the selected accent for selected syntax roles, while keeping keywords, strings, numbers, and comments distinguishable. All eleven app theme selections and all six accents are supported. Light and dark previews show their respective surface modes; the active preview matches the current app theme. Manual built-in themes retain their original palette and do not silently become adaptive.
 
 The existing code-preview preference store owns the choice and local persistence. Theme/accent continue through their existing guarded broadcast path; code settings do not gain a new broadcast contract. Theme/accent changes derive rendering colors without adding preference writes, a competing store, or new network calls. Existing saved manual themes remain unchanged; invalid inputs retain the current normalization fallback. Code text, line numbers, wrapping, independent code font sizes, and diff semantics remain unchanged.
 
@@ -153,6 +154,16 @@ Missing-model and quota banners do not offer an Upgrade action. The missing-mode
 
 The draft composer uses one surface and one visible border, including one keyboard-focus outline. The editor does not draw an additional nested frame. Project selection joins the existing bottom toolbar beside attachments and permission controls rather than occupying a separate header. The toolbar wraps at narrow widths; model selection and send controls remain available, with their existing disabled and read-only rules. The greeting and composer retain their centered widths.
 
+While a response is running, the composer border carries a slow travelling highlight so the active state reads at a glance. Rules:
+
+- The resting appearance is unchanged: the neutral `input-border` token stays the default, and no glow is drawn when no response is running.
+- The running highlight replaces the visible border rather than adding a second frame; the "one surface, one border" rule still holds.
+- The highlight paints above the composer's content, so an inner surface (the editor wrapper, the toolbar row) can never cover it. It must stay visible while content or the pointer occupies the box, and it must not intercept pointer events.
+- It uses the existing brand token, so it follows the active theme and accent without new color state.
+- Motion is slow and low-drama, consistent with the design system.
+- Under `prefers-reduced-motion` the animation is replaced by a static brand-colored border: the running state stays visible without motion.
+- The running signal is the composer's existing stop-capability state. No new state owner, timer, network request, or persistence path is introduced.
+
 Missing-model guidance is a lightweight, borderless supporting row below the draft composer, using muted text and the existing model-settings and dismissal controls. Other errors retain their diagnostic banner and actions above the composer. Do not hide recovery instructions or change error classification.
 
 `SessionPane` continues to own settings navigation and error dismissal; the composer forwards those commands to `ChatErrorBanner`. The editor retains draft and submission ownership. These presentation changes introduce no replacement command, network request, persistence path, or migration. Existing draft, runtime, quota, and remote delivery owners stay unchanged.
@@ -165,10 +176,74 @@ Acceptance scenarios:
 4. Existing diagnostic actions for other errors remain available. Long error messages remain readable without horizontal overflow.
 5. A draft shows one composer frame; focusing the editor shows one focus outline. Project selection, attachments, permission, model selection, and send remain reachable by keyboard in the bottom toolbar.
 6. At desktop and mobile widths, missing-model guidance appears below the draft composer without a filled card; its setup and dismissal actions still work. Toolbar wrapping does not create horizontal overflow or change attachment, project-selection, or submission behavior.
+7. With no response running, the composer border shows no animated highlight. While a response is running it shows the travelling highlight, still as a single border, and the highlight clears when the run ends. With `prefers-reduced-motion: reduce` the running state shows a static brand border instead of animation.
+8. With the pointer inside the composer, or with the editor and toolbar filling its surface, the running highlight stays visible; text, toolbar hit areas, and the editor remain fully interactive.
 
 ### Runnable interaction check
 
-With the isolated desktop dev server running and current Main/Host/preload artifacts ready, run `node scripts/quiet-studio-composer-e2e.mjs`. It launches a separate Electron instance with data under `.quiet-studio-runtime/composer-e2e`, never submits input, and checks typing, project/menu access, draft preservation, single-frame layout, toolbar fit at 672px and 340px composer widths, missing-model guidance placement/dismissal, and that the sidebar has no rail, one New task, one Settings, and a bottom footer. The same check selects all ten themes through Appearance, verifies distinct surface tokens and unchanged accent, reloads each selection, checks System against light/dark media changes, and captures the padded Appearance layout. Screenshots stay inside that test directory. Narrow component coverage is not a full mobile-web, multi-window broadcast, or remote-delivery test.
+With the isolated desktop dev server running and current Main/Host/preload artifacts ready, run `node scripts/quiet-studio-composer-e2e.mjs`. It launches a separate Electron instance with data under `.quiet-studio-runtime/composer-e2e`, never submits input, and checks typing, project/menu access, draft preservation, single-frame layout, toolbar fit at 672px and 340px composer widths, missing-model guidance placement/dismissal, and that the sidebar has no rail, one New task, one Settings, and a bottom footer. The same check selects all eleven themes through Appearance, verifies distinct surface tokens and unchanged accent, reloads each selection, checks System against light/dark media changes, and captures the padded Appearance layout. Screenshots stay inside that test directory. Narrow component coverage is not a full mobile-web, multi-window broadcast, or remote-delivery test.
+
+## Chat switch projection guard
+
+Switching the active chat must never render the previous session under the new task's header, not even
+for one frame. The pane acquires its per-session lease in a passive effect, so a render with the new
+`sessionId` can still hold the previous session's lease. Reading that store can expose the old
+session's snapshot (rows, pending interactions, composer, side docks, plan panels). This is the
+stale-projection risk the guard is intended to prevent, not evidence that the reported chat-switch
+flash has been resolved.
+
+Product rule: a pane whose `sessionId` does not match its current lease reads the closed projection
+(snapshot `null`), so the whole pane renders empty/connecting together until the matching lease is in
+place. `useConversationProjection` is the single owner of that stale-lease guard. The composer stays
+disabled for the entire switch (including the stale-lease frame) until the new session's first
+snapshot arrives. The timeline keeps its existing empty-then-populate behavior during the transition;
+it does not try to keep the old scroll frame. The guard never blocks a draft/prewarm render (no
+`sessionId`), which keeps its projection. No new state owner, cache, timer, or network path is
+introduced; the lease acquire/release lifecycle and the projection store are unchanged.
+
+### Current integration gap and verification limit
+
+Source review on 2026-10-12 confirms that
+[`useConversationProjection.ts`](../../packages/ui/src/v4/useConversationProjection.ts) compares
+`lease.sessionId` with `options.sessionId` and returns the closed projection on a mismatch. However,
+[`SessionPane.tsx`](../../packages/ui/src/v4/SessionPane.tsx) calls it with
+`sessionId: lease?.sessionId ?? sessionId`. When a lease exists, the expected id is therefore the
+lease's own id, so this call site cannot reject that lease as stale relative to the active session.
+The hook-level guard is present; the intended active-session invariant is not enforced by this
+integration.
+
+There are separate protections: `sessionLeaseReady` compares the lease with the active session
+and keeps the composer connecting/disabled during a mismatch; `timelineSnapshot` also checks lease
+readiness and snapshot session identity before passing content to the timeline. The bypass above
+does not mean the pane has no switch protection. However, these checks do not change the raw
+projection subscription: `snapshot` still feeds pending-interaction selection/rendering, subagent
+notifications, and the fallback share title. They therefore do not establish the whole-pane
+invariant. A null lease already yields the closed projection regardless of the expected id.
+
+```text
+Intended: active session B + retained lease A -> hook compares A with B -> closed projection
+Current:  active session B + retained lease A -> caller supplies A -> hook reads A's store
+Lease effect -> acquire B -> publish matching lease -> B's projection
+```
+
+No fix, runtime reproduction, or glitch resolution is claimed in this update.
+[`useConversationProjection.test.ts`](../../packages/ui/src/v4/useConversationProjection.test.ts)
+contains hook-level predicate assertions using a duplicated `storeForGuard` helper; it does not
+render the actual hook or exercise the `SessionPane` caller. Those assertions cannot establish the
+call-site invariant or rendered transition behavior. Acceptance requires an integrated A-to-B switch
+check, including rows, pending interactions, subagent notifications, share title, docks, composer,
+and draft/prewarm behavior.
+
+Acceptance scenarios:
+
+1. Switching from chat A to chat B never paints A's rows, interactions, docks, or composer state under
+   B's header; the pane renders empty/connecting until B's lease and snapshot are live.
+2. The composer does not re-enable and then re-disable during the switch; it stays disabled until B's
+   first snapshot.
+3. Opening a draft (no session) or a draft prewarm pane still renders its projection; the guard does
+   not suppress it.
+4. Returning to a previously opened chat that still has a live/keep-warm lease shows that session's own
+   snapshot (never another session's), because the lease matches that session.
 
 ## Queued follow-up panel
 
@@ -318,7 +393,7 @@ The copied source does not contain original dependencies, environment secrets, m
 
 1. Open actual desktop/web shell: existing task list, search, new task, project selection and tools remain usable. Exactly one Search and one Automations action appear in the sidebar; no parallel rail or duplicate product/account avatar is present.
 2. Keyboard navigate sidebar: translated accessible labels, visible focus, pressed automation state, and existing collapse/restore controls remain. The Settings-only footer opens Settings; Settings still exposes Appearance. Native title-bar drag and control hit areas do not overlap: on Windows the OS caption buttons replace the renderer-drawn window controls, and no renderer control sits under a native button.
-3. Choose each supported theme (10 options) and accent (6 options) in Appearance: live preview and actual surfaces change independently, chosen values persist, no extra broadcast/write path. Density setting toggles compact spacing.
+3. Choose each supported theme (11 options) and accent (6 options) in Appearance: live preview and actual surfaces change independently, chosen values persist, no extra broadcast/write path. Density setting toggles compact spacing.
 4. Change interface font size: only existing `--ui-font-size` changes; code and terminal sizes remain independent.
 5. Compose and submit real input with attachments: existing admission/order and optimistic overlay remain unchanged; no demo response is inserted.
 6. At narrow widths, the existing sidebar open/close path remains within the layout with no extra rail; footer actions stay reachable while long project/task lists scroll independently. Editable input keeps the mobile safe font token; reduced-motion preference suppresses decorative transitions.

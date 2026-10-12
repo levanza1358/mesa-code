@@ -1,6 +1,11 @@
 # Connected Workspace Tool Access
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI workspace/session and tool-registry maintainers  
+**Authority:** contract  
+**Scope:** tool visibility for connected Git and non-Git workspaces  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; local/remote runtime scenarios were not rerun
 
 ## Product behavior
 

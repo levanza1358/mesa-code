@@ -1,6 +1,11 @@
 # Context Compaction Frequency
 
-Status: accepted (implemented in `apps/mesa-code-cli/packages/core`)
+**Status:** active  
+**Owner:** CLI core context/compaction maintainers  
+**Authority:** contract  
+**Scope:** automatic compaction threshold, hysteresis, and reactive recovery boundary  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; historical measurements below were not rerun
 
 ## Problem
 

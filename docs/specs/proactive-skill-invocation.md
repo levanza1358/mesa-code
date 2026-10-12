@@ -1,6 +1,11 @@
 # Proactive skill invocation
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI skill-tool and context maintainers  
+**Authority:** contract  
+**Scope:** proactive skill selection, lazy loading, and same-run task continuation  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; model compliance and stall diagnosis require separate evidence
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # Mesa Code: Quiet Studio working boundary
 
-Work only in `C:\Users\Kuroneko\Documents\project\mesacode-quiet-studio`. Never modify the original `C:\Users\Kuroneko\Documents\project\mesacode` project or reuse its environment secrets or runtime data.
+Work only in the checkout that contains this file (the current repository root). The workspace path is not fixed — this project may be moved, cloned, or checked out on another machine — so never hard-code an absolute path, and never modify a different checkout of Mesa Code. Do not reuse another checkout's environment secrets or runtime data; verify isolation before launch.
 
 Quiet Studio is a presentation variant of **Mesa Code**, not a package, protocol, or storage rename. Stage 1 covers the shared shell, chat, sidebar, and Appearance only; retain backend behavior and other features. Read the [documentation index](docs/README.md) after this file; it routes the active spec, architecture, design, setup, and evidence documents for each task. Historical/archive documents and skills are not redesign targets.
 

@@ -1,6 +1,6 @@
 # Theme Set Reduction
 
-Status: **Superseded** — all ten themes are now selectable.
+Status: **Superseded** — all eleven themes are now selectable.
 
 ## History
 
@@ -15,7 +15,7 @@ theme now defines its own background, sidebar, panel, surface, card, popover,
 input, border, foreground, terminal, toast, tooltip, tag, semantic status, diff,
 and git colors. They are no longer accent-only swaps.
 
-All ten themes are selectable in the Appearance settings:
+All eleven themes are selectable in the Appearance settings:
 
 | Theme | Presented as | Resolves to |
 | --- | --- | --- |
@@ -29,6 +29,7 @@ All ten themes are selectable in the Appearance settings:
 | `purple` | Purple | dark |
 | `rose` | Rose | dark |
 | `amber` | Amber | dark |
+| `liquid` | Liquid | dark |
 
 ## Migration
 

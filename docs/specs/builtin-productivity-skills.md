@@ -1,5 +1,12 @@
 # Builtin productivity skills and installer delivery
 
+**Status:** active  
+**Owner:** builtin plugin catalog and desktop packaging maintainers  
+**Authority:** contract  
+**Scope:** instruction-pack catalog, seeding, suppression, and delivery checks  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; listed checks were not rerun
+
 ## Product rules
 
 Mesa Code expands its builtin plugin catalog with curated first-party skill packs for development, quality, documents, data, and project operations. This request is a bounded addition beyond Quiet Studio's presentation stage: it does not redesign plugin settings or restore removed marketplace modules. Use the current builtin packaging and seeding interfaces.
@@ -32,10 +39,10 @@ Existing user-uninstalled builtins must remain suppressed on restart. New packs 
 
 ## Runnable checks
 
-- `node scripts/check-builtin-productivity.mjs` validates the six manifests, 24 English skills, unique IDs, safe in-bundle paths, and the release asset manifest produced by the existing SEA collector.
+- `node scripts/check-builtin-productivity.mjs` validates the twelve manifests, 48 English skills, unique IDs, safe in-bundle paths, and the release asset manifest produced by the existing SEA collector.
 - `node scripts/check-builtin-productivity.mjs --desktop` additionally compares the staged `bundled-agents/<platform>/glm/packages/*-plugin` copies with their sources after `pnpm --filter @mesa-code/desktop prepare:agent-bundle`.
-- `pnpm exec tsx scripts/check-builtin-productivity-discovery.mjs` runs real plugin discovery: all six packs load and are enabled by the existing default set, an explicit disable keeps the plugin visible but disabled, and a persisted uninstall suppression removes it from discovery.
+- `pnpm exec tsx scripts/check-builtin-productivity-discovery.mjs` runs real plugin discovery: all twelve packs load and are enabled by the existing default set, an explicit disable keeps the plugin visible but disabled, and a persisted uninstall suppression removes it from discovery.
 
-- With `pnpm dev:desktop` serving current renderer and desktop artifacts, `node scripts/check-builtin-extensions-e2e.mjs` opens a separate isolated Electron profile, selects Extensions User scope, refreshes Skills, and asserts all 26 visible skill names (24 toolkit skills plus 2 Browser Use skills). It also verifies the eight-plugin inventory and captures a screenshot under `.quiet-studio-runtime/builtin-checks`. It does not change the active user's plugin configuration.
+- With `pnpm dev:desktop` serving current renderer and desktop artifacts, `node scripts/check-builtin-extensions-e2e.mjs` opens a separate isolated Electron profile, selects Extensions User scope, refreshes Skills, and asserts all 50 visible skill names (48 toolkit skills plus 2 Browser Use skills). It also verifies the fourteen-plugin inventory and captures a screenshot under `.quiet-studio-runtime/builtin-checks`. It does not change the active user's plugin configuration.
 
 These checks cover source, staging, discovery, and the development Extensions UI. Full installer creation and installed-runtime verification remain separate and are reported honestly.

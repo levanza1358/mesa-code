@@ -1,6 +1,11 @@
 # OpenAI reasoning effort compatibility
 
-Status: Implemented
+**Status:** active  
+**Owner:** provider catalog and model-option adapter maintainers  
+**Authority:** contract  
+**Scope:** catalog reasoning levels and OpenAI Responses serialization compatibility  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; upstream acceptance was not probed
 
 ## Product behavior
 

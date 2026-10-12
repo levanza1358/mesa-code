@@ -1,5 +1,12 @@
 # Built-in subagents roster
 
+**Status:** active  
+**Owner:** shared roster, CLI subagent, and Settings maintainers  
+**Authority:** contract  
+**Scope:** built-in profiles, model overrides, tool boundaries, and bundle inclusion  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; bundle and installer checks are separate
+
 ## Product rules
 
 Mesa Code ships a curated roster of **built-in subagents** that the Agent tool can delegate to. Each built-in is a source-defined profile (not a file on disk) with a focused purpose, an explicit identity color, and the smallest tool surface that lets it do its job. The roster grows from two agents to eight:
@@ -66,7 +73,7 @@ agents-state.json builtInModelSelectionOverrides: { <built-in name>: ModelSelect
 ## Runnable checks
 
 - `pnpm typecheck` and `pnpm lint` from the repository root; report real results.
-- New tests run with the workspace `tsx`, e.g. `node_modules/.bin/tsx --test apps/mesa-code-cli/packages/core/test/built-in-agents.test.ts` (core roster/override/unknown-type), `packages/services/test/...` (list of eight, reserved names), and `packages/shared/test/...` (override migration for all names).
+- Run the existing focused tests with `pnpm exec tsx --test apps/mesa-code-cli/packages/core/test/built-in-agents.test.ts packages/services/test/built-in-subagents.test.ts packages/shared/test/subagent-state-migration.test.ts`. They address core roster/overrides/unknown types, service listing/reserved names, and persisted override migration respectively; they do not prove model compliance or installed-runtime behavior.
 - Installer inclusion: `pnpm --filter "@mesa-code/cli..." build` then grep `apps/mesa-code-cli/packages/cli/dist/mesa-code.cjs` for `Plan`, `Verify`, `CodeReviewer`, `Debugger`, `Writer`, `Tester`. Full installer creation and installed-runtime verification remain separate and are reported honestly.
 
 ## Non-goals

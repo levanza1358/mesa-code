@@ -4,7 +4,8 @@
 **Owner:** repository and release maintainers  
 **Authority:** product naming and compatibility identifiers  
 **Scope:** Mesa Code branding, package names, paths, and repository identity  
-**Updated:** 2026-10-09 16:31 (local time)
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; naming and storage differences are not migration authorization
 
 Read the [documentation index](../README.md) first. This is a compatibility reference, not a request to bulk-rename source or storage identifiers.
 
@@ -14,10 +15,10 @@ Mesa Code is the product and technical project name. This document records the
 product naming rule, the internal identifier convention, and the canonical Git
 repository.
 
-The rename is complete across `shared`, `rpc`, `services`, `server`, `ui`,
-`web`, `desktop`, and `apps/mesa-code-cli`: every Mesa Code source file uses
-kebab-case and every import specifier matches its target file name. The
-convention is pinned in `docs/specs/mesa-code-naming.md`.
+The naming convention is pinned in the [naming specification](../specs/mesa-code-naming.md).
+It is a rule for new work, not certification that every current file or import
+conforms: existing camelCase files remain in the checkout. Do not bulk-rename
+those files or compatibility identifiers as part of a documentation refresh.
 
 ## Product naming
 

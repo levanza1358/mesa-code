@@ -1,6 +1,16 @@
 # Office document read capability
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI contracts, Office adapter, and Read-tool maintainers  
+**Authority:** contract  
+**Scope:** bounded read-only text extraction from spreadsheets, Word, presentations, and rich text  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; historical change sections remain unchanged
+
+Paths abbreviated as `packages/core`, `packages/contracts`, `packages/adapters`, or
+`bootstrap/src` below are relative to `apps/mesa-code-cli/`, not the repository's
+root `packages/`. Read [file authoring guidance](file-authoring-guidance.md) for
+binary artifact creation; this specification owns reading only.
 
 ## Problem
 

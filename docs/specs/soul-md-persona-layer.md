@@ -1,6 +1,11 @@
 # SOUL.md persona layer
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI context-source and SOUL Settings maintainers  
+**Authority:** contract  
+**Scope:** persona file discovery, prompt-layer precedence, and explicit draft generation/save  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; precedence diagram ambiguity is noted below
 
 ## Product behavior
 
@@ -46,6 +51,12 @@ Skills and other files
         ^
 User request in the current chat
 ```
+
+The diagram above places the current chat request below persona/instruction files,
+while the safety boundary explicitly says persona cannot override an explicit
+current-chat request. That ambiguity remains a contract clarification, not proof
+that prompt ordering enforces priority. File/section presence cannot prove model
+compliance, and prompt text cannot grant code-level permissions.
 
 ## Ownership and boundary
 

@@ -1,8 +1,11 @@
 # Mesa Code Windows-only distribution
 
-## Status
-
-Implemented
+**Status:** active  
+**Owner:** release and desktop packaging maintainers  
+**Authority:** contract  
+**Scope:** Windows x64 distribution target and explicit uninstall data deletion  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; no package or uninstall was run
 
 ## Product rule
 

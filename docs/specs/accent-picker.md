@@ -1,8 +1,13 @@
 # Accent Picker
 
-Status: Implemented
+**Status:** active  
+**Owner:** UI theme and Appearance maintainers  
+**Authority:** contract  
+**Scope:** independent accent selection, semantic tokens, persistence, and broadcast  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; acceptance scenarios are not runtime evidence
 
-Depends on: `docs/theme-catalog.md`
+Related: [theme catalog](../theme-catalog.md), [Quiet Studio Appearance](quiet-studio.md).
 
 ## Goal
 

@@ -1,6 +1,11 @@
 # Context Prompt-Injection Budget
 
-Status: accepted (implemented in `apps/mesa-code-cli/packages/core`)
+**Status:** active  
+**Owner:** CLI core context maintainers  
+**Authority:** contract  
+**Scope:** Mesa-owned prompt compression without changing user instructions or section interfaces  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; measured results below describe the original trim, not a fresh benchmark
 
 ## Problem
 
@@ -83,6 +88,11 @@ of every turn (≈−21% of the three trimmed blocks, ≈−6.5% of a ~7,290-tok
 baseline). The trimmed minimum (`cli_prefix` + `identity` + `dynamic_behavior` +
 `memory` + `env_info` + `context_management`) is 7,327 chars / 2,444 estimated
 tokens.
+
+The original measurement description above labels the minimal fixture Desktop
+while saying `desktop_context` is absent, which conflicts with the Desktop gate
+required below. Re-establish the fixture/surface before reusing its total as current
+evidence. The original measurement is retained, not silently reassigned.
 
 ## State owner
 

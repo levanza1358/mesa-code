@@ -1,6 +1,11 @@
 # Full Access plan auto-approval
 
-Status: Implemented
+**Status:** active  
+**Owner:** CLI protocol interaction-broker maintainers  
+**Authority:** contract  
+**Scope:** ExitPlanMode approval under an existing Full Access grant  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; approval scenarios were not rerun
 
 ## Problem
 

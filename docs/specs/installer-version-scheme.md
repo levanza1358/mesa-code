@@ -1,8 +1,11 @@
 # Installer version scheme
 
-## Status
-
-Implemented
+**Status:** active  
+**Owner:** release and desktop packaging maintainers  
+**Authority:** contract  
+**Scope:** numeric installer version increments and their packaging consumers  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; no version bump or build was run
 
 ## Product rule
 

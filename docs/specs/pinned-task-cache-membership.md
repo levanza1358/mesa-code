@@ -1,6 +1,11 @@
 # Pinned Task Cache Membership
 
-Status: Implemented and verified
+**Status:** active  
+**Owner:** UI task-list cache maintainers  
+**Authority:** contract  
+**Scope:** optimistic, confirmed, and rollback pinned/archive query membership  
+**Updated:** 2026-10-12 08:39 (local time)  
+**Verification:** source-only documentation review; earlier verification notes below were not rerun
 
 ## Scope
 
@@ -137,6 +142,10 @@ sequenceDiagram
 9. Local and remote workspaces use the same cache transition semantics.
 
 ## Verification
+
+The notes below record an earlier pass, including its branch-freshness limitation;
+they are not a statement of the current checkout baseline or fresh test results.
+Use the dated [verification log](../verification-log.md) for evidence context.
 
 - `packages/ui/test/pinnedTaskCacheMembership.test.ts` covers pin, repeated pin, unpin, archive,
   insertion into an empty Pinned result, and the incorrect-`previousState` regression.
