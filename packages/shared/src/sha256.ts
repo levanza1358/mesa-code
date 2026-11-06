@@ -137,7 +137,7 @@ export async function sha256(value: Uint8Array | ArrayBuffer | string): Promise<
   const subtle = globalThis.crypto?.subtle;
   if (subtle && typeof subtle.digest === "function") {
     try {
-      const digest = await subtle.digest("SHA-256", bytes as unknown as BufferSource);
+      const digest = await subtle.digest("SHA-256", bytes as Parameters<typeof subtle.digest>[1]);
       return new Uint8Array(digest);
     } catch {
       // Fall through to the pure-JS path rather than failing the caller.

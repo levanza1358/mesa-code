@@ -90,7 +90,10 @@ test("reduced motion replaces the glow animation", () => {
     (node) =>
       node.type === "atrule" &&
       node.name === "media" &&
-      node.params.includes("prefers-reduced-motion"),
+      // The stylesheet also carries a `prefers-reduced-motion: no-preference`
+      // block for transition trimming, so select the `reduce` branch explicitly.
+      node.params.includes("prefers-reduced-motion") &&
+      !node.params.includes("no-preference"),
   );
 
   assert.ok(reducedMotion, "expected a prefers-reduced-motion block");

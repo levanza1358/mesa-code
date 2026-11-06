@@ -3,9 +3,34 @@
 **Status:** active evidence ledger  
 **Owner:** project maintainers and coding agents  
 **Scope:** dated source, test, runtime, build, and packaging evidence  
-**Updated:** 2026-10-12 10:09 (local time)
+**Updated:** 2026-11-07
 
 This file is append-only. Each entry proves only the command or scenario named in that entry. Specifications, source, and package scripts remain authoritative for behavior.
+
+## 2026-11-07 — Verification before committing the accumulated working tree
+
+Scope: root version `1.1.0` checkout on Windows, Node `v24.22.0`, pnpm `10.33.2`. These checks cover
+source verification only; no installer, packaging, or runtime launch is claimed.
+
+- `node scripts/check-workspace-freshness.mjs` — passed; `main` in sync with `origin/main`.
+- `pnpm typecheck` — passed (`tsc -b` over rpc, provider, provider-node, shared, services, client, server, mesa-code-server-cli, ui, web, desktop host).
+- `pnpm --dir apps/mesa-code-cli typecheck` — passed (turbo typecheck across CLI packages).
+- `pnpm lint` — 6 pre-existing `no-unused-vars` warnings in `packages/ui/src/Root.tsx`, `SettingsPage.tsx`, and `WorkspaceSidebar.tsx`; 0 errors. A stray root `index.js` minified bundle raised the only error and was removed from the working tree, not committed.
+- `pnpm architecture:check --changed` — passed; 0 violations, 0 new.
+- `node --import tsx --test test/*.test.ts` run inside `packages/ui` — 149/149 passed. Running the same files from the repository root fails with `ERR_MODULE_NOT_FOUND` for `@/...` aliases, so the package directory is the working directory.
+
+## 2026-11-05 — Release 1.0.5 audit
+
+Scope: current-checkout audit only. No existing user changes were reset, reverted, or deleted.
+
+- `node scripts/check-workspace-freshness.mjs` — passed; branch `integrate-zcode-updates`, ahead 0 / behind 0 relative to `origin/main`.
+- Root `package.json` — version is `1.0.5`; source metadata only, not a built installer.
+- `git status --short` — 22 modified files plus untracked `docs/specs/bash-output-isolation.md`; no unrelated change was altered.
+- `git diff --check` — no whitespace errors; only expected LF/CRLF conversion warnings.
+- Node is `v24.22.0`; runbook pins `24.14.0`. `pnpm` was blocked by PowerShell execution policy (`pnpm.ps1`); no typecheck, lint, architecture check, build, or installer run is claimed.
+- Bash isolation spec is catalogued. `SessionPane` reuses stable empty arrays for disconnected/draft frames. Source evidence only; no long-chat runtime or packaged EXE evidence.
+
+Blockers: use permitted `pnpm` with Node `24.14.0`; build `MesaCode-1.0.5-win-x64.exe`; inspect metadata; separately verify install/launch/uninstall and long-chat streaming.
 
 ## 2026-10-12 10:09 (local time) — Documentation review fixes (theme catalog, LAN runbook)
 

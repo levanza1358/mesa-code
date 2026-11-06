@@ -1,3 +1,10 @@
+/* Keep non-essential motion cheap while preserving focus and state transitions. */
+@media (prefers-reduced-motion: no-preference) {
+  .quiet-studio-conversation :where(.transition-all, .transition-transform, .transition-opacity) {
+    transition-duration: 100ms;
+  }
+}
+
 .quiet-studio-nav-selected {
   background-color: var(--color-accent);
   box-shadow: inset 2px 0 0 var(--color-brand);

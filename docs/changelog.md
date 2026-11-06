@@ -3,9 +3,29 @@
 **Status:** active history  
 **Owner:** project maintainers and coding agents  
 **Scope:** append-only work history for this workspace  
-**Updated:** 2026-10-12 10:09 (local time)
+**Updated:** 2026-11-07
 
 Entries are reverse chronological. Timestamps use local workspace time. This file records events; active source remains authoritative.
+
+## 2026-11-07 — Commit accumulated working-tree changes
+
+Brings the previously uncommitted CLI, desktop, and UI work into history under root version `1.1.0`.
+
+- **CLI execution:** merged Bash stdout/stderr now prepares its temporary output file before spawn (with the execution output root as fallback) instead of opening it after the child starts; background records reuse the prepared path. See [`specs/bash-output-isolation.md`](specs/bash-output-isolation.md).
+- **CLI protocol:** `plugins:describe`, `plugins:list`, and `plugins:overview` run without the NDJSON processing queue, and marketplace manifest repair takes the plugin storage write lock only on the miss path.
+- **CLI runtime:** steer admission is persisted before it is published to the active-turn lane, and `drainPendingInput` claims its slot before any await.
+- **Desktop startup:** the first window no longer waits on ARMS init or an unbounded workspace bootstrap, and the renderer load either settles the window or is reported as a failure.
+- **UI:** task lists keep committed rows during background refreshes, chat scroll memory survives reloads via `localStorage`, and disconnected/draft session frames reuse stable empty arrays.
+- **Test maintenance:** `composerRunningGlow.test.ts` now selects the `prefers-reduced-motion: reduce` block explicitly, since the stylesheet gained a `no-preference` block for transition trimming.
+
+## 2026-11-05 — Release 1.0.5 audit and Bash output isolation
+
+Current checkout audit confirms root version `1.0.5`. The working tree contains unrelated CLI/runtime changes plus the new Bash-output isolation specification; no existing changes were reset or deleted. `SessionPane` now reuses stable empty timeline props for disconnected/draft frames. Release packaging and long-chat runtime performance remain unverified in this pass.
+
+- **Docs:** Added and catalogued [`docs/specs/bash-output-isolation.md`](specs/bash-output-isolation.md), documenting temporary merged Bash output placement, fallback, and cleanup ownership.
+- **Evidence boundary:** Existing source changes are not treated as release evidence. A fresh Windows x64 artifact, install/launch, signature, and long-chat interaction check are still required.
+
+See [`verification-log.md`](verification-log.md) for audit evidence and blockers.
 
 ## 2026-10-12 10:09 (local time) — Correct theme-catalog and LAN-runbook claims
 
