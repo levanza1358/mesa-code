@@ -747,6 +747,7 @@ export async function describeMarketplacePlugin(input: {
   marketplace: string;
   name: string;
   storageRoot: string;
+  withWriteLock?: <T>(write: () => Promise<T>) => Promise<T>;
 }): Promise<DescribeMarketplacePluginResult> {
   const diagnostics: PluginValidationDiagnostic[] = [];
   const pluginId = `${input.name}@${input.marketplace}`;
@@ -774,11 +775,17 @@ export async function describeMarketplacePlugin(input: {
 
   let manifest: PluginMarketplaceManifest | null = null;
   try {
-    await ensureMarketplaceManifestAvailable({
-      marketplace: input.marketplace,
-      storageRoot: input.storageRoot,
-    });
     manifest = loadMarketplaceManifestSync(input.storageRoot, input.marketplace);
+    if (!manifest) {
+      const withWriteLock = input.withWriteLock ?? ((write) => write());
+      await withWriteLock(() =>
+        ensureMarketplaceManifestAvailable({
+          marketplace: input.marketplace,
+          storageRoot: input.storageRoot,
+        }),
+      );
+      manifest = loadMarketplaceManifestSync(input.storageRoot, input.marketplace);
+    }
   } catch (error) {
     diagnostics.push(toValidationDiagnostic(error, pluginId));
     return { components: [], diagnostics };

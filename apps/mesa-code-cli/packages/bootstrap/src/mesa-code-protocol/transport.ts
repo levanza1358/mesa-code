@@ -20,6 +20,11 @@ type MesaCodeProtocolMessageHandler = (
 ) => Promise<MesaCodeProtocolOutgoingMessage | undefined>;
 
 const PROTOCOL_EOF_DRAIN_MS = 100;
+const PLUGIN_READ_IMMEDIATE_METHODS = new Set<string>([
+  mesaCodeProtocolMethods.pluginsDescribe,
+  mesaCodeProtocolMethods.pluginsList,
+  mesaCodeProtocolMethods.pluginsOverview,
+]);
 
 interface MesaCodeProtocolNdjsonConnectionOptions {
   signal?: AbortSignal;
@@ -163,6 +168,16 @@ export class MesaCodeProtocolNdjsonConnection {
       // Agent 发出反向 request 前已同步登记 pending response。
       // 若 response 等待“最后一个排队请求开始”，后续普通请求会把等待点推到当前长请求之后，
       // 形成「当前请求等 response、response 等后续请求」的死锁。
+      void this.handleMessage(message).catch((error: unknown) => {
+        this.fail(error instanceof Error ? error : new Error(String(error)));
+      });
+      return;
+    }
+    if (
+      "id" in message &&
+      "method" in message &&
+      PLUGIN_READ_IMMEDIATE_METHODS.has(message.method)
+    ) {
       void this.handleMessage(message).catch((error: unknown) => {
         this.fail(error instanceof Error ? error : new Error(String(error)));
       });

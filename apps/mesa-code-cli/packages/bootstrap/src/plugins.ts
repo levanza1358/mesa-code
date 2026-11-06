@@ -218,6 +218,7 @@ interface ValidateMesaCodePluginOptions extends ResolveMesaCodePluginsOptions {
 }
 
 interface DescribeMesaCodePluginOptions extends ResolveMesaCodePluginsOptions {
+  withWriteLock?: <T>(write: () => Promise<T>) => Promise<T>;
   marketplace: string;
   pluginName: string;
 }
@@ -1006,11 +1007,11 @@ export async function describeMesaCodePlugin(
   options: DescribeMesaCodePluginOptions,
 ): Promise<DescribeMarketplacePluginResult> {
   const { pluginStorageRoot } = resolvePluginContext(options);
-  ensureDefaultPluginMarketplaces(pluginStorageRoot);
   return describeMarketplacePlugin({
     marketplace: options.marketplace,
     name: options.pluginName,
     storageRoot: pluginStorageRoot,
+    ...(options.withWriteLock ? { withWriteLock: options.withWriteLock } : {}),
   });
 }
 

@@ -490,14 +490,13 @@ export async function describePlugin(
 ): Promise<MesaCodePluginsDescribeResult> {
   const params = parseParams(mesaCodePluginsDescribeParamsSchema, rawParams);
   const pluginStorageRoot = resolvePluginStorageRoot(params.workspace.workspacePath);
-  const result = await withPluginStorageLock(pluginStorageRoot, async () =>
-    describeMesaCodePlugin({
-      logger: context.logger,
-      marketplace: params.marketplace,
-      pluginName: params.pluginName,
-      workingDirectory: params.workspace.workspacePath,
-    }),
-  );
+  const result = await describeMesaCodePlugin({
+    logger: context.logger,
+    marketplace: params.marketplace,
+    pluginName: params.pluginName,
+    withWriteLock: (write) => withPluginStorageLock(pluginStorageRoot, write),
+    workingDirectory: params.workspace.workspacePath,
+  });
   const components: MesaCodePluginComponentGroup[] = result.components.map((group) => ({
     kind: group.kind,
     items: group.items.map((item) => ({
