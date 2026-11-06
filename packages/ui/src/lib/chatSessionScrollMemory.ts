@@ -7,8 +7,48 @@ export interface ChatSessionScrollMemoryState {
 }
 
 const CHAT_SESSION_SCROLL_MEMORY_MAX_ENTRIES = 200;
+const CHAT_SESSION_SCROLL_MEMORY_STORAGE_KEY = "mesa-code-chat-scroll-memory";
 
 const chatSessionScrollMemory = new Map<string, ChatSessionScrollMemoryState>();
+let hydratedFromStorage = false;
+
+function hydrateChatSessionScrollMemory(): void {
+  if (hydratedFromStorage || typeof window === "undefined") return;
+  hydratedFromStorage = true;
+  try {
+    const raw = window.localStorage.getItem(CHAT_SESSION_SCROLL_MEMORY_STORAGE_KEY);
+    if (!raw) return;
+    const entries = JSON.parse(raw) as unknown;
+    if (!Array.isArray(entries)) return;
+    for (const entry of entries) {
+      if (!Array.isArray(entry) || typeof entry[0] !== "string" || !entry[1]) continue;
+      const state = entry[1] as ChatSessionScrollMemoryState;
+      if (
+        Number.isFinite(state.scrollTop) &&
+        Number.isFinite(state.scrollHeight) &&
+        Number.isFinite(state.clientHeight) &&
+        Number.isFinite(state.updatedAt)
+      ) {
+        chatSessionScrollMemory.set(entry[0], state);
+      }
+    }
+    pruneChatSessionScrollMemory();
+  } catch {
+    // Storage can be unavailable in private/webview contexts; memory-only fallback is sufficient.
+  }
+}
+
+function persistChatSessionScrollMemory(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      CHAT_SESSION_SCROLL_MEMORY_STORAGE_KEY,
+      JSON.stringify([...chatSessionScrollMemory.entries()]),
+    );
+  } catch {
+    // Storage quota/security failures must not affect scrolling.
+  }
+}
 
 function normalizeKeyPart(value?: string | null): string | null {
   const normalized = value?.trim();
@@ -68,6 +108,7 @@ export function buildChatSessionScrollMemoryKey({
 export function readChatSessionScrollMemoryState(
   key: string | null,
 ): ChatSessionScrollMemoryState | null {
+  hydrateChatSessionScrollMemory();
   if (!key) {
     return null;
   }
@@ -84,8 +125,10 @@ export function saveChatSessionScrollMemoryState(
     return;
   }
 
+  hydrateChatSessionScrollMemory();
   touchChatSessionScrollMemoryEntry(key, state);
   pruneChatSessionScrollMemory();
+  persistChatSessionScrollMemory();
 }
 
 export function resolveChatSessionScrollRestoreTop(

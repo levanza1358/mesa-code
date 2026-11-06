@@ -215,6 +215,10 @@ import type {
   ChatViewSummaryPanelVariant,
   ConversationFindMatchState,
 } from "@/v4/legacyChatViewTypes.js";
+
+// Keep disconnected/draft frames from allocating fresh array props for the memoized timeline.
+const EMPTY_TIMELINE_ROWS: readonly ConversationRow[] = [];
+const EMPTY_PENDING_GUIDES: never[] = [];
 import type { SessionLease } from "@/v4/sessionDataLayer.js";
 import { V4InteractionDialogs } from "@/v4/V4InteractionDialogs.js";
 import {
@@ -4745,8 +4749,10 @@ export function SessionPane({
               scrollToBottomActionRef={timelineScrollToBottomRef}
               scrollToQueryActionRef={timelineScrollToQueryRef}
               selectionPanelLayoutContainerRef={conversationLayoutContainerRef}
-              rows={timelineSnapshot?.rows.window ?? []}
-              pendingGuides={timelineSnapshot ? pendingGuideProjection?.pendingGuides : []}
+              rows={timelineSnapshot?.rows.window ?? EMPTY_TIMELINE_ROWS}
+              pendingGuides={
+                timelineSnapshot ? (pendingGuideProjection?.pendingGuides ?? EMPTY_PENDING_GUIDES) : EMPTY_PENDING_GUIDES
+              }
               apiRetry={timelineSnapshot?.control.apiRetry ?? null}
               totalCount={timelineSnapshot?.rows.totalCount ?? 0}
               sessionKey={sessionId ?? "draft"}

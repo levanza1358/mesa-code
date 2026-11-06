@@ -131,7 +131,10 @@ export function WorkspaceTimelineTasksSection({
   const workspaceTabsSignature = useMemo(
     () =>
       workspaceTabs
-        .map((tab) => `${tab.workspaceIdentity?.trim() || tab.workspacePath}:${tab.workspacePath}`)
+        .map(
+          (tab) =>
+            `${tab.workspaceIdentity?.trim() || tab.workspacePath}:${tab.workspacePath}:${tab.remoteSessionId ?? ""}:${tab.remoteTarget ? "remote" : "local"}`,
+        )
         .join("|"),
     [workspaceTabs],
   );
@@ -202,28 +205,50 @@ export function WorkspaceTimelineTasksSection({
       .sort((left, right) => compareMesaCodeTaskListItems(left, right, taskSortBy));
   }, [localItems, remoteItems, remotePinnedTaskIdSet, taskSortBy]);
   const items = sortedItems.slice(0, visibleTaskLimit);
+  const lastVisibleItemsRef = useRef<MesaCodeTaskMeta[]>([]);
+  const lastVisibleWorkspaceTabsSignatureRef = useRef(workspaceTabsSignature);
+  if (lastVisibleWorkspaceTabsSignatureRef.current !== workspaceTabsSignature) {
+    lastVisibleWorkspaceTabsSignatureRef.current = workspaceTabsSignature;
+    lastVisibleItemsRef.current = [];
+  }
+  if (items.length > 0) {
+    lastVisibleItemsRef.current = items;
+  }
+  // Keep committed rows during background refresh; transient empty results must not remount the section.
+  const visibleItems =
+    items.length === 0 &&
+    (localLoading ||
+      remoteWorkspaceKeys.some(
+        (workspaceKey) => remoteTimelineLoadingByWorkspaceKey[workspaceKey],
+      ))
+      ? lastVisibleItemsRef.current
+      : items;
   const itemByKey = useMemo(() => {
     const nextItemByKey = new Map<string, MesaCodeTaskMeta>();
-    for (const item of items) {
+    for (const item of visibleItems) {
       nextItemByKey.set(
         buildTimelineItemKey(item.workspacePath, item.taskId, item.workspaceIdentity),
         item,
       );
     }
     return nextItemByKey;
-  }, [items]);
+  }, [visibleItems]);
   const itemByKeyRef = useRef(itemByKey);
   const workspaceServiceLookupRef = useRef(workspaceServiceLookup);
   itemByKeyRef.current = itemByKey;
   workspaceServiceLookupRef.current = workspaceServiceLookup;
+  const scopedItems = useMemo(
+    () =>
+      visibleItems.filter((item) =>
+        workspaceServiceLookup.has(buildTaskWorkspaceKey(item.workspacePath, item.workspaceIdentity)),
+      ),
+    [visibleItems, workspaceServiceLookup],
+  );
   const timelineGroups = useMemo(() => {
-    const visibleItems = items.filter((item) =>
-      workspaceServiceLookup.has(buildTaskWorkspaceKey(item.workspacePath, item.workspaceIdentity)),
-    );
     if (!groupByDate) {
-      return [{ key: "all", label: null, items: visibleItems }];
+      return [{ key: "all", label: null, items: scopedItems }];
     }
-    return groupTaskTimelineItems(items, {
+    return groupTaskTimelineItems(scopedItems, {
       sortBy: taskSortBy,
       now: Date.now(),
       locale,
@@ -237,7 +262,7 @@ export function WorkspaceTimelineTasksSection({
         ),
       }))
       .filter((group) => group.items.length > 0);
-  }, [groupByDate, items, locale, taskSortBy, workspaceServiceLookup]);
+  }, [groupByDate, locale, scopedItems, taskSortBy]);
   const remoteTotal = remoteWorkspaceKeys.reduce(
     (sum, workspaceKey) =>
       sum +
@@ -611,7 +636,7 @@ export function WorkspaceTimelineTasksSection({
     }
   }, [itemByKey]);
 
-  if (items.length === 0 && loading) {
+  if (visibleItems.length === 0 && loading) {
     return (
       <div className="flex min-h-0 flex-col px-2">
         <TaskListLoadingHint />
@@ -619,7 +644,7 @@ export function WorkspaceTimelineTasksSection({
     );
   }
 
-  if (items.length === 0) {
+  if (visibleItems.length === 0) {
     return (
       <div className="px-3 py-2 text-ui-base text-foreground-subtle">
         {emptyMessage ?? intl.formatMessage({ id: "taskList.noTasks" })}

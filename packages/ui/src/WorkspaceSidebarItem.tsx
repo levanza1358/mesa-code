@@ -230,7 +230,15 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
   const baseServices = useBaseWorkspaceServices();
   const mesaCodeTaskService = services.mesaCodeTaskService;
   const taskItemsRef = useRef(taskItems);
-  taskItemsRef.current = taskItems;
+  // Keep the last committed rows during stale-while-revalidate. An empty loading result is not an
+  // authoritative archive; replacing the list with a spinner causes the Tasks section to flicker.
+  if (taskItems.length > 0 || !taskListLoading) {
+    taskItemsRef.current = taskItems;
+  }
+  const displayedTaskItems =
+    taskListLoading && taskItems.length === 0 && taskItemsRef.current.length > 0
+      ? taskItemsRef.current
+      : taskItems;
   // pinned 行不在 taskItems 里（TaskList 会把它们从主列表剔除），只查 taskItems 会让
   // unpin 找不到 previousTask：乐观分支和 query cache mutation 全部被跳过，行无法再回到
   // timeline。任务行可能属于任一集合，查找必须同时覆盖两者。
@@ -1176,7 +1184,7 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
             workspacePath={tab.workspacePath}
             remoteSessionId={tab.remoteSessionId}
             workspaceIdentity={tab.workspaceIdentity}
-            tasks={taskItems}
+            tasks={displayedTaskItems}
             pinnedTasks={pinnedTasks}
             activeTaskId={isActiveWorkspace ? activeTaskId : null}
             onSelectTask={handleSelectTask}
