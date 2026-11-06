@@ -62,6 +62,7 @@ This catalog helps AI agents choose the smallest relevant specification. It is n
 | [`mesa-code-naming.md`](mesa-code-naming.md)                                           | Implemented                                      | File and symbol naming                                                                                                                                             |
 | [`openai-reasoning-effort-compatibility.md`](openai-reasoning-effort-compatibility.md) | Implemented                                      | Reasoning-level compatibility                                                                                                                                      |
 | [`conversation-rendering-performance.md`](conversation-rendering-performance.md)       | Source optimizations; chat-switch fix unverified | Conversation rendering and switch projection; `SessionPane` passes `lease?.sessionId ?? sessionId`, so a stale existing lease does not exercise the mismatch guard |
+| [`bash-output-isolation.md`](bash-output-isolation.md)                                 | Active contract                                  | Temporary merged Bash stdout/stderr placement, fallback, and cleanup |
 
 ## Historical or superseded specifications
 

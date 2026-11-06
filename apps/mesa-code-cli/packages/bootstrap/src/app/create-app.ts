@@ -1,4 +1,5 @@
 import { isAbsolute, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import {
   createInMemorySessionEventStore,
   createNodeToolArtifactStore,
@@ -401,6 +402,7 @@ export async function createMesaCodeApp(options: MesaCodeAppOptions): Promise<Me
           caCertFile: configResult.config.network.caCertFile,
         },
         outputRootDir: join(storageRoot, "cli", "exec"),
+        bashOutputTempDir: tmpdir(),
         processEnv: options.env ?? process.env,
       });
     const ownsExecutionPort = options.executionPort === undefined;

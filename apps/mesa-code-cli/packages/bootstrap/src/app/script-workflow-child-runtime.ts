@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createNodeContextSourceAdapter } from "@mesa-code/adapters/context";
 import { createNodeExecutionAdapter } from "@mesa-code/adapters/exec";
 import { createNodeFileSystemAdapter } from "@mesa-code/adapters/fs";
@@ -201,6 +202,7 @@ function createRuntimeDeps(
           caCertFile: deps.configResult.config.network.caCertFile,
         },
         outputRootDir: join(deps.storageRoot, "cli", "exec"),
+        bashOutputTempDir: tmpdir(),
         processEnv: deps.appOptions.env ?? process.env,
       }),
     fileSystemPort: deps.appOptions.fileSystemPort ?? createNodeFileSystemAdapter(),
