@@ -144,8 +144,9 @@ export async function steerTurn(
     ...(toolDisallowlist ? { toolDisallowlist } : {}),
     turnId: activeTurn.turnId,
   };
-  activeTurn.pendingInputs.push(pendingInput);
-  const queueLength = activeTurn.pendingInputs.length;
+  // Persist admission before publishing it to the active-turn discard path. If stop/finalization
+  // races this await, the durable queue event survives instead of being removed as a cancellation.
+  const queueLength = activeTurn.pendingInputs.length + 1;
   const event = createSessionEvent(
     SessionEventType.TurnSteerQueued,
     this.sessionId,
@@ -171,6 +172,10 @@ export async function steerTurn(
     },
   );
   await this.appendEvent(event, activeTurn.traceContext);
+  // Publish to the in-memory lane only after durable admission. Finalization can now
+  // preserve the item through projection instead of racing a pre-event array push. If the turn
+  // ended during append, the persisted item must remain on the external FIFO, not a stale turn.
+  if (this.activeTurn === activeTurn) activeTurn.pendingInputs.push(pendingInput);
   this.logger?.debug("Turn steer queued", {
     ...traceContextToLogContext(activeTurn.traceContext),
     activeTurnKind: activeTurn.kind,
@@ -1145,12 +1150,18 @@ export async function drainPendingInput(
     traceContext: TraceContext;
   },
 ): Promise<DrainedPendingInputDiagnostics | undefined> {
-  if (this.permissionFullAccessPending || this.activeTurn !== options.activeTurn) return undefined;
-  if (unpublishedPermissionGrants.has(this)) await recoverPendingPermissionGrant(this);
-  if (this.permissionFullAccessPending || this.activeTurn !== options.activeTurn) return undefined;
-  // Guide 出队先移除内存、后落事件；完整消费期间不能从旧投影捕获授权目标。
+  if (
+    this.permissionFullAccessPending ||
+    this.activeTurn !== options.activeTurn ||
+    (this.pendingInputDrains ?? 0) > 0
+  ) {
+    return undefined;
+  }
+  // Claim before any await: a second model/stop boundary must not drain the same guide.
   this.pendingInputDrains = (this.pendingInputDrains ?? 0) + 1;
   try {
+    if (unpublishedPermissionGrants.has(this)) await recoverPendingPermissionGrant(this);
+    if (this.permissionFullAccessPending || this.activeTurn !== options.activeTurn) return undefined;
     return await drainPendingInputUnlocked.call(this, options);
   } finally {
     this.pendingInputDrains -= 1;

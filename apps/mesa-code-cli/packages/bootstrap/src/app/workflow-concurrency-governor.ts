@@ -14,11 +14,14 @@
 // 这里是治理器里**唯一**会碰时钟与定时器的地方：控制器只收 `now`；冷却到期要唤醒等待者，
 // 所以需要一个 setTimeout（可注入，unref）。
 
-import type {
-  ModelNetworkStatusEvent,
-  ModelRequestAdmission,
-  ModelRequestAdmissionTicket,
-  ModelRequestTarget,
+import { resolveWorkflowModelFailurePolicy } from "@mesa-code/adapters/model";
+import {
+  ModelErrorCode,
+  type ModelNetworkStatusEvent,
+  type ModelRequestAdmission,
+  type ModelRequestAdmissionTicket,
+  type ModelRequestFailedStatusEvent,
+  type ModelRequestTarget,
 } from "@mesa-code/contracts";
 import {
   ConcurrencyController,
@@ -215,6 +218,10 @@ function createWorkflowConcurrencyGovernor(
           case "model_request_failed":
             // retryable:true 的 failed 紧随一条 retry_scheduled——那条才是信号。
             if (event.retryable) return;
+            if (isWorkflowStopFailure(event)) {
+              settle((at) => bucket.controller.ended(at));
+              return;
+            }
             // 不可重试的限流：
             // 主对话 / 工具侧撞上 3008 这类被分类器判终止的 429，仍是一次字面意义上的并发信号——
             // 只当「链结束」会让 cap 从未因它降过。配额码也走这一支：多减一次半，run 随即停下，无害。
@@ -345,6 +352,19 @@ function createWorkflowConcurrencyGovernor(
       return buckets.get(key)?.controller.snapshot();
     },
   };
+}
+
+function isWorkflowStopFailure(event: ModelRequestFailedStatusEvent): boolean {
+  return (
+    resolveWorkflowModelFailurePolicy(
+      {
+        code: event.errorCode ?? ModelErrorCode.ModelRequestFailed,
+        reason: event.reason,
+        retryable: event.retryable,
+      },
+      event.providerErrorCode,
+    ).decision === "stop"
+  );
 }
 
 function abortedError(signal: AbortSignal): Error {
