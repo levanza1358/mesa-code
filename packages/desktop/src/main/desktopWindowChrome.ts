@@ -144,14 +144,15 @@ function buildDesktopWindowVisualOptions() {
 
   if (process.platform === "win32") {
     return {
-      backgroundColor: "#00000000",
+      // Keep the first compositor frame opaque. Transparent Acrylic could expose a split
+      // host surface (black on the left, empty gray on the right) before renderer paint.
+      backgroundColor: "#151718",
       // Windows 窗口操作改用 OS 原生标题按钮：保留系统 frame 以获得原生命中测试、
       // Snap 布局与系统主题跟随，再隐藏默认标题栏、开启 Window Controls Overlay，
       // 让原生按钮叠加在 renderer 顶部栏之上。renderer 只负责让出右侧安全区，不再自绘按钮。
       frame: true,
       titleBarStyle: "hidden" as const,
       titleBarOverlay: true,
-      backgroundMaterial: "acrylic" as const,
     };
   }
 
@@ -576,6 +577,9 @@ export function createBrowserWindow(options: {
     minHeight: MIN_DESKTOP_WINDOW_HEIGHT,
     title: options.title,
     icon: options.iconPath,
+    // Reuse the main window's opaque native surface as the startup splash.
+    // No second BrowserWindow: primary-window discovery cannot be confused.
+    show: true,
     // Linux frameless 后部分桌面环境仍可能显示 Electron 原生菜单栏，自动隐藏避免顶部出现两套菜单。
     autoHideMenuBar: isLinuxDesktopWindow(),
     ...buildDesktopWindowVisualOptions(),

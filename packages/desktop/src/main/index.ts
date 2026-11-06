@@ -113,7 +113,6 @@ import {
   type AppShutdownKind,
 } from "./appShutdownPolicy.js";
 import { createPrimaryWindowCoordinator } from "./primaryWindowCoordinator.js";
-
 import { flushMainE2ECoverage } from "./e2eCoverage.js";
 import { resolveStartupWindowBootstrap, type StartupWindowBootstrap } from "./startupWorkspace.js";
 import {
@@ -2269,10 +2268,11 @@ app.whenReady().then(async () => {
     listSSHConfigAliases,
   });
 
-  // 等待 ARMS 完成 init（含渲染进程注入监听），避免首窗 dom-ready 早于 SDK 注册导致无上报
-  await armsInitPromise;
+  // ARMS must not gate the first window: a stalled telemetry endpoint otherwise leaves the startup splash visible.
+  // Renderer injection remains best-effort; the main UI owns startup completion.
+  void armsInitPromise.catch(() => {});
 
-  // ARMS init 完成后首次写入 user.name（落 device_mid）
+  // ARMS init completes asynchronously; identity sync is best-effort and must not block startup.
   void armsUserIdentitySync.refresh();
 
   // 未配置 ARMS 端点时不初始化上报 context，避免把空转误当成已启用。

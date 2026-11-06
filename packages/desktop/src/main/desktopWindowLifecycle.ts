@@ -169,6 +169,28 @@ export function createWindow(options: {
   let domReadyGeneration = 0;
   let cancelRuntimeProcessEnvWait: (() => void) | null = null;
   scheduleArmsBrowserPerfLoadNudge(win.webContents);
+  let rendererLoadSettled = false;
+  const settleRendererLoad = (reason: string) => {
+    if (rendererLoadSettled || win.isDestroyed()) return;
+    rendererLoadSettled = true;
+    options.logger.info(`[createWindow] renderer load settled (${reason})`);
+    if (process.platform === "win32" && !win.isVisible()) {
+      win.show();
+      win.focus();
+    }
+  };
+  win.webContents.once("did-finish-load", () => settleRendererLoad("did-finish-load"));
+  win.webContents.once("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return;
+    options.logger.warn(
+      `[createWindow] renderer load failed code=${errorCode} description=${errorDescription} url=${validatedURL}`,
+    );
+    settleRendererLoad("did-fail-load");
+  });
+  win.webContents.once("render-process-gone", (_event, details) => {
+    options.logger.warn(`[createWindow] renderer process gone reason=${details.reason}`);
+    settleRendererLoad("render-process-gone");
+  });
   win.webContents.on("dom-ready", async () => {
     cancelRuntimeProcessEnvWait?.();
     cancelRuntimeProcessEnvWait = null;

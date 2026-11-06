@@ -78,8 +78,17 @@ export function createPrimaryWindowCoordinator(deps: PrimaryWindowCoordinatorDep
     // 如果 ready 和 activate 都各自 resolveStartupWindowBootstrap 后直接 createWindow，
     // 最新版首次启动就可能并发创建两个主窗口。这里用单飞 promise 收敛成一次创建。
     deps.logger.info(`[primary-window] creating main window (${reason})`);
-    pendingEnsurePromise = deps
-      .resolveStartupWindowBootstrap()
+    const bootstrapTimeout = new Promise<StartupWindowBootstrap>((resolve) => {
+      const timeout = setTimeout(() => {
+        deps.logger.info(`[primary-window] bootstrap timed out; creating window with defaults (${reason})`);
+        resolve({});
+      }, 8_000);
+      timeout.unref?.();
+    });
+    pendingEnsurePromise = Promise.race([
+      deps.resolveStartupWindowBootstrap(),
+      bootstrapTimeout,
+    ])
       .then((startupBootstrap) => {
         if (revealExistingWindow()) {
           deps.logger.info(`[primary-window] window became available before create (${reason})`);
@@ -87,6 +96,13 @@ export function createPrimaryWindowCoordinator(deps: PrimaryWindowCoordinatorDep
         }
 
         deps.createWindow(startupBootstrap);
+      })
+      .catch((error) => {
+        deps.logger.info(`[primary-window] bootstrap failed; creating window with defaults (${reason})`);
+        deps.logger.info(String(error));
+        if (!revealExistingWindow()) {
+          deps.createWindow({});
+        }
       })
       .finally(() => {
         pendingEnsurePromise = null;
